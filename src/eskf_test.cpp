@@ -1,12 +1,12 @@
-#include "lidar_eskf/ImuOdom.h"
+#include "lidar_eskf/eskf.h"
 
 int main(int argc, char **argv)
 {
     // initialize ros
-    ros::init(argc, argv, "imu_test");
+    ros::init(argc, argv, "eskf_test");
     ros::NodeHandle n("~");
 
-    ImuOdom imu(n);
+    ESKF eskf(n);
 
     ros::spin();
 }

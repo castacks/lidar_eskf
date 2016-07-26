@@ -1,4 +1,4 @@
-#include "lidar_eskf/ImuOdom.h"
+#include "lidar_eskf/eskf.h"
 
 
 inline tf::Matrix3x3 vec_to_rot(tf::Vector3 w) {
@@ -16,7 +16,7 @@ inline tf::Matrix3x3 skew(tf::Vector3 w) {
     return R;
 }
 
-ImuOdom::ImuOdom(ros::NodeHandle &nh) {
+ESKF::ESKF(ros::NodeHandle &nh) {
 
     nh.param("imu_frequency",           _imu_freq,         50.0);
     nh.param("sigma_acceleration",      _sigma_acc,        0.1);
@@ -39,14 +39,23 @@ ImuOdom::ImuOdom(ros::NodeHandle &nh) {
     // initialize error states
     _d_velocity.setZero();
     _d_theta.setZero();
+    _d_rotation.setIdentity();
     _d_position.setZero();
     _d_bias_acc.setZero();
     _d_bias_gyr.setZero();
 
-    // initialize measurements
+    // initialize imu
     _imu_acceleration.setZero();
     _imu_angular_velocity.setZero();
     _imu_orientation.setRPY(0.0,0.0,0.0);
+
+    // initialize measurements
+    _m_velocity.setZero();
+    _m_rotation.setIdentity();
+    _m_quaternion.setRPY(0.0, 0.0, 0.0);
+    _m_position.setZero();
+    _m_theta.setZero();
+    _got_measurements = false;
 
     // initialize Jacobian matrix;
     _Fx.setZero();
@@ -63,22 +72,35 @@ ImuOdom::ImuOdom(ros::NodeHandle &nh) {
     _init_time = true;
 
     // subscriber and publisher
-    _imu_sub = nh.subscribe("/imu", 50, &ImuOdom::imu_callback, this);
+    _imu_sub = nh.subscribe("/imu", 50, &ESKF::imu_callback, this);
+    _meas_sub = nh.subscribe("/measurements", 50, &ESKF::measurement_callback, this);
     _imu_odom_pub = nh.advertise<nav_msgs::Odometry>("imu_odom", 50, true);
 }
 
-void ImuOdom::imu_callback(const sensor_msgs::Imu &msg) {
+void ESKF::imu_callback(const sensor_msgs::Imu &msg) {
     update_time(msg);
-    update_measurements(msg);
+    update_imu(msg);
 
     propagate_state();
     propagate_error();
     propagate_covariance();
 
+    ROS_INFO("imu_odom: imu");
+    // when a new measurement is available, update odometry
+    if(_got_measurements) {
+        ROS_INFO("imu_odom: got measurement");
+        // do measurements update
+        update_error();
+        update_state();
+        reset_error();
+
+        _got_measurements = false;
+    }
+
     publish_odom();
 }
 
-void ImuOdom::update_time(const sensor_msgs::Imu &msg) {
+void ESKF::update_time(const sensor_msgs::Imu &msg) {
 
     if(_init_time) {
         _dt = 1.0 / _imu_freq;
@@ -90,7 +112,7 @@ void ImuOdom::update_time(const sensor_msgs::Imu &msg) {
     _imu_time = msg.header.stamp;
 }
 
-void ImuOdom::update_measurements(const sensor_msgs::Imu &msg) {
+void ESKF::update_imu(const sensor_msgs::Imu &msg) {
     _imu_acceleration.setX(msg.linear_acceleration.x);
     _imu_acceleration.setY(msg.linear_acceleration.y);
     _imu_acceleration.setZ(msg.linear_acceleration.z);
@@ -103,9 +125,10 @@ void ImuOdom::update_measurements(const sensor_msgs::Imu &msg) {
     _imu_orientation.setY(msg.orientation.y);
     _imu_orientation.setZ(msg.orientation.z);
     _imu_orientation.setW(msg.orientation.w);
+
 }
 
-void ImuOdom::propagate_state() {
+void ESKF::propagate_state() {
     tf::Vector3   velocity;
     tf::Matrix3x3 rotation;
     tf::Vector3   position;
@@ -129,13 +152,13 @@ void ImuOdom::propagate_state() {
     _rotation.getRotation(_quaternion);
 }
 
-void ImuOdom::propagate_error() {
+void ESKF::propagate_error() {
 
     // system transition function for error state
     // this is not necessary because it is always zero with out measurement update
 }
 
-void ImuOdom::propagate_covariance() {
+void ESKF::propagate_covariance() {
     // compute jacobian
     Eigen::Matrix<double, 3, 3> I = Eigen::MatrixXd::Identity(3, 3);
     Eigen::Matrix<double, 3, 3> Z = Eigen::MatrixXd::Zero(3, 3);
@@ -166,7 +189,7 @@ void ImuOdom::propagate_covariance() {
     _Sigma = _Fx * _Sigma * _Fx.transpose() + _Fn * _Q * _Fn.transpose();
 }
 
-void ImuOdom::publish_odom() {
+void ESKF::publish_odom() {
     nav_msgs::Odometry msg;
     msg.header.frame_id = "world";
     msg.header.stamp = _imu_time;
@@ -207,4 +230,93 @@ void ImuOdom::publish_odom() {
 
     // publish message
     _imu_odom_pub.publish(msg);
+}
+
+void ESKF::measurement_callback(const nav_msgs::Odometry &msg) {
+    _m_velocity.setX(msg.twist.twist.linear.x);
+    _m_velocity.setY(msg.twist.twist.linear.y);
+    _m_velocity.setZ(msg.twist.twist.linear.z);
+
+    _m_quaternion.setW(msg.pose.pose.orientation.w);
+    _m_quaternion.setX(msg.pose.pose.orientation.x);
+    _m_quaternion.setY(msg.pose.pose.orientation.y);
+    _m_quaternion.setZ(msg.pose.pose.orientation.z);
+
+    _m_rotation.setRotation(_m_quaternion);
+    _m_rotation.getRPY(_m_theta[0], _m_theta[1], _m_theta[2]);
+
+    _m_position.setX(msg.pose.pose.position.x);
+    _m_position.setY(msg.pose.pose.position.y);
+    _m_position.setZ(msg.pose.pose.position.z);
+
+    for(int i=0; i<6; i++) {
+        for(int j=0; j<6; j++) {
+            _m_pose_sigma(i, j) = msg.pose.covariance[6*i+j];
+            _m_twist_sigma(i, j) = msg.twist.covariance[6*i+j];
+        }
+    }
+
+    _got_measurements = true;
+}
+
+void ESKF::update_error() {
+    // assume only pose measurement is used
+    Eigen::Matrix<double, 6, 15> H;
+    Eigen::Matrix<double, 3, 3> I = Eigen::MatrixXd::Identity(3, 3);
+    Eigen::Matrix<double, 3, 3> Z = Eigen::MatrixXd::Zero(3, 3);
+    H << Z, I, Z, Z, Z,
+         Z, Z, I, Z, Z;
+
+    // measurements
+    Eigen::Matrix<double, 6, 1> y;
+    y[0] = _m_theta.x();    y[1] = _m_theta.y();    y[2] = _m_theta.z();
+    y[3] = _m_position.x(); y[4] = _m_position.y(); y[5] = _m_position.z();
+
+    // state
+    Eigen::Matrix<double, 15, 1> x;
+    x[0] = _d_velocity.x();  x[1] = _d_velocity.y();  x[2] = _d_velocity.z();
+    x[3] = _d_theta.x();     x[4] = _d_theta.y();     x[5] = _d_theta.z();
+    x[6] = _d_position.x();  x[7] = _d_position.y();  x[8] = _d_position.z();
+    x[9] = _d_bias_acc.x();  x[10] = _d_bias_acc.y(); x[11] = _d_bias_acc.z();
+    x[12] = _d_bias_gyr.x(); x[13] = _d_bias_gyr.y(); x[14] = _d_bias_gyr.z();
+
+    // kalman gain matrix
+    Eigen::Matrix<double, 15, 6> K;
+    K = _Sigma * H.transpose() * (H * _Sigma * H.transpose() + _m_pose_sigma).inverse();
+
+    // update error
+    x = K * (y - H * x);
+
+    _d_velocity.setValue(x[0],  x[1],  x[2]);
+    _d_theta.setValue(   x[3],  x[4],  x[5]);
+    _d_position.setValue(x[6],  x[7],  x[8]);
+    _d_bias_acc.setValue(x[9],  x[10], x[11]);
+    _d_bias_gyr.setValue(x[12], x[13], x[14]);
+
+    _d_rotation.setRPY(_d_theta.x(),_d_theta.y(),_d_theta.z());
+
+    // update covariance
+    Eigen::Matrix<double, 15, 15> M;
+    M = Eigen::MatrixXd::Identity(15,15) - K*H;
+    _Sigma = M * _Sigma * M.transpose() + K * _m_pose_sigma * K.transpose();
+
+}
+
+void ESKF::update_state() {
+    _velocity += _d_velocity;
+    _rotation *= _d_rotation;
+    _position += _d_position;
+    _bias_acc += _d_bias_acc;
+    _bias_gyr += _d_bias_gyr;
+
+    _rotation.getRotation(_quaternion);
+}
+
+void ESKF::reset_error() {
+    _d_velocity.setZero();
+    _d_theta.setZero();
+    _d_rotation.setIdentity();
+    _d_position.setZero();
+    _d_bias_acc.setZero();
+    _d_bias_gyr.setZero();
 }

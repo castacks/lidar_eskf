@@ -1,5 +1,5 @@
-#ifndef IMUODOM_H
-#define IMUODOM_H
+#ifndef ESKF_H
+#define ESKF_H
 
 #include <ros/ros.h>
 #include <sensor_msgs/Imu.h>
@@ -8,18 +8,24 @@
 #include <tf_conversions/tf_eigen.h>
 #include <Eigen/Dense>
 
-class ImuOdom {
+class ESKF {
 public:
-    ImuOdom(ros::NodeHandle &nh);
-    ~ImuOdom() {}
+    ESKF(ros::NodeHandle &nh);
+    ~ESKF() {}
 
     void imu_callback(const sensor_msgs::Imu &msg);
     void update_time(const sensor_msgs::Imu &msg);
-    void update_measurements(const sensor_msgs::Imu &msg);
-    void propagate_state();
+    void update_imu(const sensor_msgs::Imu &msg);
     void propagate_error();
     void propagate_covariance();
+    void propagate_state();
     void publish_odom();
+
+    void measurement_callback(const nav_msgs::Odometry &msg);
+    void update_error();
+    void update_state();
+    void reset_error();
+
 private:
 
     // nominal states
@@ -31,15 +37,16 @@ private:
     tf::Vector3    _bias_gyr;
 
     // error states
-    tf::Vector3 _d_velocity;
-    tf::Vector3 _d_theta;
-    tf::Vector3 _d_position;
-    tf::Vector3 _d_bias_acc;
-    tf::Vector3 _d_bias_gyr;
+    tf::Vector3   _d_velocity;
+    tf::Vector3   _d_theta;
+    tf::Matrix3x3 _d_rotation;
+    tf::Vector3   _d_position;
+    tf::Vector3   _d_bias_acc;
+    tf::Vector3   _d_bias_gyr;
 
     // imu measurements
-    tf::Vector3 _imu_acceleration;
-    tf::Vector3 _imu_angular_velocity;
+    tf::Vector3    _imu_acceleration;
+    tf::Vector3    _imu_angular_velocity;
     tf::Quaternion _imu_orientation;
 
     // Jacobian matrices
@@ -68,7 +75,19 @@ private:
 
     // subscriber and publisher
     ros::Subscriber _imu_sub;
+    ros::Subscriber _meas_sub;
     ros::Publisher  _imu_odom_pub;
+
+    // odometry measurements
+    tf::Vector3    _m_velocity;
+    tf::Matrix3x3  _m_rotation;
+    tf::Quaternion _m_quaternion;
+    tf::Vector3    _m_theta;
+    tf::Vector3    _m_position;
+    bool _got_measurements;
+
+    Eigen::Matrix<double, 6, 6> _m_pose_sigma;
+    Eigen::Matrix<double, 6, 6> _m_twist_sigma;
 
 };
 

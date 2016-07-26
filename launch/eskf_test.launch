@@ -10,7 +10,7 @@
     	      
 	<node pkg="tf" type="static_transform_publisher" name="world_view" args="0 0 0 0 0 3.1415926 world world_view 100"/> 
 	
-	<node pkg="lidar_eskf" type="imu_test" name="imu_test" output="screen">
+	<node pkg="lidar_eskf" type="eskf_test" name="eskf_test" output="screen">
 	
 	    <remap from="/imu"                      to="/microstrain/imu"/>
         <param name="imu_frequency"             value="50"/>
