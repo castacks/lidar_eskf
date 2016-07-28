@@ -7,6 +7,8 @@
 #include <tf/tf.h>
 #include <tf_conversions/tf_eigen.h>
 #include <Eigen/Dense>
+#include <queue>
+#include <boost/circular_buffer.hpp>
 
 class ESKF {
 public:
@@ -89,6 +91,10 @@ private:
     Eigen::Matrix<double, 6, 6> _m_pose_sigma;
     Eigen::Matrix<double, 6, 6> _m_twist_sigma;
 
+    // a queue to smooth imu accleration measurements
+    std::vector<geometry_msgs::Vector3> _acc_queue;
+    int _acc_queue_size;
+    int _acc_queue_count;
 };
 
 #endif // IMUODOM_H
