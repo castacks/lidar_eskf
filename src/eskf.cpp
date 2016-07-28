@@ -1,6 +1,5 @@
 #include "lidar_eskf/eskf.h"
 
-
 inline tf::Matrix3x3 vec_to_rot(tf::Vector3 w) {
     tf::Matrix3x3 R;
     R.setRPY(w.x(), w.y(), w.z());
@@ -20,13 +19,14 @@ ESKF::ESKF(ros::NodeHandle &nh) {
 
     nh.param("imu_frequency",           _imu_freq,         50.0);
     nh.param("sigma_acceleration",      _sigma_acc,        0.1);
-    nh.param("sigma_gyroscop",          _sigma_gyr,        0.001);
-    nh.param("sigma_acceleration_bias", _sigma_bias_acc,   0.00001);
-    nh.param("sigma_gyroscope_bias",    _sigma_bias_gyr,   0.000001);
+    nh.param("sigma_gyroscop",          _sigma_gyr,        0.01);
+    nh.param("sigma_acceleration_bias", _sigma_bias_acc,   0.0001);
+    nh.param("sigma_gyroscope_bias",    _sigma_bias_gyr,   0.00001);
     nh.param("gravity",                 _g,                9.82);
     nh.param("init_bias_acc_x",         _init_bias_acc_x,  0.0);
     nh.param("init_bias_acc_y",         _init_bias_acc_y,  0.0);
     nh.param("init_bias_acc_z",         _init_bias_acc_z,  0.0);
+    nh.param("acc_queue_size",          _acc_queue_size,   5);
 
     // initialize nomial states
     _velocity.setZero();
@@ -75,6 +75,9 @@ ESKF::ESKF(ros::NodeHandle &nh) {
     _imu_sub = nh.subscribe("/imu", 50, &ESKF::imu_callback, this);
     _meas_sub = nh.subscribe("/measurements", 50, &ESKF::measurement_callback, this);
     _imu_odom_pub = nh.advertise<nav_msgs::Odometry>("imu_odom", 50, true);
+
+    // acc queue
+    _acc_queue_count = 0;
 }
 
 void ESKF::imu_callback(const sensor_msgs::Imu &msg) {
@@ -85,10 +88,8 @@ void ESKF::imu_callback(const sensor_msgs::Imu &msg) {
     propagate_error();
     propagate_covariance();
 
-    ROS_INFO("imu_odom: imu");
     // when a new measurement is available, update odometry
     if(_got_measurements) {
-        ROS_INFO("imu_odom: got measurement");
         // do measurements update
         update_error();
         update_state();
@@ -113,9 +114,25 @@ void ESKF::update_time(const sensor_msgs::Imu &msg) {
 }
 
 void ESKF::update_imu(const sensor_msgs::Imu &msg) {
-    _imu_acceleration.setX(msg.linear_acceleration.x);
-    _imu_acceleration.setY(msg.linear_acceleration.y);
-    _imu_acceleration.setZ(msg.linear_acceleration.z);
+
+    // stacking into a queue
+    if(_acc_queue_count < _acc_queue_size) {
+        _acc_queue.push_back(msg.linear_acceleration);
+        tf::vector3MsgToTF(msg.linear_acceleration, _imu_acceleration);
+    }
+    else {
+        _acc_queue[_acc_queue_count%_acc_queue_size] = msg.linear_acceleration;
+
+        tf::Vector3 acc_avg;
+        acc_avg.setZero();
+        for(int i=0; i<_acc_queue_size; i++) {
+            acc_avg[0] += _acc_queue[i].x / _acc_queue_size;
+            acc_avg[1] += _acc_queue[i].y / _acc_queue_size;
+            acc_avg[2] += _acc_queue[i].z / _acc_queue_size;
+        }
+        _imu_acceleration = acc_avg;
+    }
+    _acc_queue_count++;
 
     _imu_angular_velocity.setX(msg.angular_velocity.x);
     _imu_angular_velocity.setY(msg.angular_velocity.y);
@@ -227,6 +244,9 @@ void ESKF::publish_odom() {
             msg.twist.covariance[6*i+j] = twist_sigma(i, j);
         }
     }
+
+    std::cout << "eskf: pose sigma = " <<std::endl;
+    std::cout << pose_sigma << std::endl;
 
     // publish message
     _imu_odom_pub.publish(msg);
