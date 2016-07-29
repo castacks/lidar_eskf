@@ -1,12 +1,18 @@
 #include "lidar_eskf/eskf.h"
 
-ros::Publisher fake_odom_pub;
+ros::Publisher fake_meas_pub;
 ros::Subscriber imu_odom_sub;
+ros::Subscriber fake_odom_sub;
 
 tf::Vector3 position;
 tf::Vector3 velocity;
 tf::Matrix3x3 rotation;
 tf::Quaternion quaternion;
+
+tf::Vector3    d_velocity;
+tf::Vector3    d_position;
+tf::Matrix3x3  d_rotation;
+tf::Quaternion d_quaternion;
 
 double pos_sigma, rot_sigma;
 
@@ -26,21 +32,21 @@ void imu_odom_callback(const nav_msgs::Odometry &msg) {
 
     rotation.setRotation(quaternion);
 }
+void fake_odom_callback(const nav_msgs::Odometry &msg) {
+    tf::Vector3 fake_position;
+    tf::Matrix3x3 fake_rotation;
+    tf::Quaternion fake_quaternion;
 
-void publish_fake_odom(const ros::TimerEvent&) {
-    tf::Vector3    d_velocity;
-    tf::Vector3    d_position;
-    tf::Matrix3x3  d_rotation;
-    tf::Quaternion d_quaternion;
+    tf::pointMsgToTF(msg.pose.pose.position, fake_position);
+    tf::quaternionMsgToTF(msg.pose.pose.orientation, fake_quaternion);
+    fake_rotation.setRotation(fake_quaternion);
 
-    d_velocity = -velocity;
-    d_position = -position;
-
-    double r, p, y;
-    d_rotation.setRotation(quaternion);
-    d_rotation.getRPY(r, p, y);
-    d_rotation.setRPY(-r, -p, -y);
+    d_position = fake_position - position;
+    d_rotation = rotation.transpose() * fake_rotation;
     d_rotation.getRotation(d_quaternion);
+
+}
+void publish_fake_measure(const ros::TimerEvent&) {
 
     nav_msgs::Odometry msg;
     msg.header.frame_id = "world";
@@ -62,7 +68,7 @@ void publish_fake_odom(const ros::TimerEvent&) {
     msg.pose.covariance[28] = pow(rot_sigma, 2.0);
     msg.pose.covariance[35] = pow(rot_sigma, 2.0);
 
-    fake_odom_pub.publish(msg);
+    fake_meas_pub.publish(msg);
 }
 
 int main(int argc, char **argv)
@@ -79,10 +85,11 @@ int main(int argc, char **argv)
     rotation.setIdentity();
     quaternion.setRPY(0.0,0.0,0.0);
 
-    fake_odom_pub = n.advertise<nav_msgs::Odometry>("fake_measurements", 50, true);
-    imu_odom_sub = n.subscribe("imu_odom", 50, &imu_odom_callback);
+    fake_meas_pub = n.advertise<nav_msgs::Odometry>("fake_measurements", 50, true);
+    imu_odom_sub  = n.subscribe("imu_odom", 50, &imu_odom_callback);
+    fake_odom_sub = n.subscribe("fake_odom", 50, &fake_odom_callback);
 
-    ros::Timer timer = n.createTimer(ros::Duration(0.025), publish_fake_odom);
+    ros::Timer timer = n.createTimer(ros::Duration(0.5), publish_fake_measure);
     ESKF eskf(n);
 
     ros::spin();

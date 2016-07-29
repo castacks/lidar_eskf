@@ -74,8 +74,8 @@ ESKF::ESKF(ros::NodeHandle &nh) {
     // subscriber and publisher
     _imu_sub = nh.subscribe("/imu", 50, &ESKF::imu_callback, this);
     _meas_sub = nh.subscribe("/measurements", 50, &ESKF::measurement_callback, this);
-    _imu_odom_pub = nh.advertise<nav_msgs::Odometry>("imu_odom", 50, true);
-
+    _odom_pub = nh.advertise<nav_msgs::Odometry>("imu_odom", 50, true);
+    _bias_pub = nh.advertise<geometry_msgs::TwistStamped>("bias", 50, true);
     // acc queue
     _acc_queue_count = 0;
 }
@@ -94,7 +94,7 @@ void ESKF::imu_callback(const sensor_msgs::Imu &msg) {
         update_error();
         update_state();
         reset_error();
-
+        publish_bias();
         _got_measurements = false;
     }
 
@@ -245,11 +245,28 @@ void ESKF::publish_odom() {
         }
     }
 
-    std::cout << "eskf: pose sigma = " <<std::endl;
-    std::cout << pose_sigma << std::endl;
+//    std::cout << "eskf: pose sigma = " <<std::endl;
+//    std::cout << pose_sigma << std::endl;
 
     // publish message
-    _imu_odom_pub.publish(msg);
+    _odom_pub.publish(msg);
+}
+
+void ESKF::publish_bias() {
+    geometry_msgs::TwistStamped msg;
+
+    msg.header.frame_id = "world";
+    msg.header.stamp = _imu_time;
+
+    msg.twist.linear.x = _bias_acc.x();
+    msg.twist.linear.y = _bias_acc.y();
+    msg.twist.linear.z = _bias_acc.z();
+
+    msg.twist.angular.x = _bias_gyr.x();
+    msg.twist.angular.y = _bias_gyr.y();
+    msg.twist.angular.z = _bias_gyr.z();
+
+    _bias_pub.publish(msg);
 }
 
 void ESKF::measurement_callback(const nav_msgs::Odometry &msg) {

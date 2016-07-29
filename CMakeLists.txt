@@ -60,6 +60,8 @@ include_directories(
 ## Declare C++ library
 add_library(eskf src/eskf.cpp)
 target_link_libraries(eskf ${catkin_LIBRARIES})
+add_library(particles src/particles.cpp)
+target_link_libraries(particles ${catkin_LIBRARIES})
 
 add_executable(eskf_test src/eskf_test.cpp)
 target_link_libraries(eskf_test eskf ${catkin_LIBRARIES}  )

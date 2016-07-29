@@ -22,6 +22,7 @@ public:
     void propagate_covariance();
     void propagate_state();
     void publish_odom();
+    void publish_bias();
 
     void measurement_callback(const nav_msgs::Odometry &msg);
     void update_error();
@@ -78,7 +79,7 @@ private:
     // subscriber and publisher
     ros::Subscriber _imu_sub;
     ros::Subscriber _meas_sub;
-    ros::Publisher  _imu_odom_pub;
+    ros::Publisher  _odom_pub, _bias_pub;
 
     // odometry measurements
     tf::Vector3    _m_velocity;
