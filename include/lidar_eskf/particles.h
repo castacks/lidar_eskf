@@ -8,9 +8,10 @@
 #include "tf/tf.h"
 #include "tf_conversions/tf_eigen.h"
 #include "lidar_eskf/EigenMultivariateNormal.hpp"
+#include "lidar_eskf/map.h"
 
 #define SET_SIZE 500
-#define STATE_SIZE 15
+#define STATE_SIZE 6
 
 struct Particle {
     Eigen::Matrix<double, STATE_SIZE, 1> state;
@@ -25,17 +26,21 @@ class Particles {
 public:
     Particles(Eigen::Matrix<double, STATE_SIZE, 1> &mean,
               Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov,
-              pcl::PointCloud<pcl::PointXYZ> &cloud);
+              pcl::PointCloud<pcl::PointXYZ> &cloud,
+              DistMap &map,
+              double ray_sigma,
+              double log_offset);
     ~Particles() {}
-
-    void init_map();
 
     void init_set();
     void weight_set();
 
-    void get_posterior(Eigen::Matrix<double, STATE_SIZE, 1> &mean, Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov);
-    void get_pseudo_meas();
+    void get_posterior();
 
+    void reproject_cloud(Particle &p, pcl::PointCloud<pcl::PointXYZ> &cloud);
+    void weight_particle(Particle &p, pcl::PointCloud<pcl::PointXYZ> &cloud);
+
+    void propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean, Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov);
 private:
     std::vector<Particle> _pset;
     std::vector<Particle> _d_pset;
@@ -48,7 +53,11 @@ private:
     Eigen::Matrix<double, STATE_SIZE, 1> _d_mean_posterior;
     Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> _d_cov_posterior;
 
-    pcl::PointCloud<pcl::PointXYZ> _cloud;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr _cloud_ptr;
+    boost::shared_ptr<DistMap> _map_ptr;
+
+    double _ray_sigma;
+    double _log_offset;
 
 };
 #endif // PARTICLES_H

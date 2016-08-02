@@ -1,10 +1,15 @@
 #include "lidar_eskf/particles.h"
 
-
+inline double log_likelihood(double x, double sigma) {
+    return -0.91893853320467274178 - log(sigma) - 0.5 * pow(x/sigma, 2.0);
+}
 
 Particles::Particles(Eigen::Matrix<double, STATE_SIZE, 1> &mean,
                      Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov,
-                     pcl::PointCloud<pcl::PointXYZ> &cloud) {
+                     pcl::PointCloud<pcl::PointXYZ> &cloud,
+                     DistMap &map,
+                     double ray_sigma,
+                     double log_offset) {
     _mean_prior.setZero();
     _mean_posterior.setZero();
     _d_mean_prior.setZero();
@@ -15,16 +20,23 @@ Particles::Particles(Eigen::Matrix<double, STATE_SIZE, 1> &mean,
     _mean_prior = mean;
     _d_cov_prior = cov;
 
-    _cloud.resize(cloud.size());
-    _cloud = cloud;
+    // strong pointers to cloud and map
+    _cloud_ptr.reset(&cloud);
+    _map_ptr.reset(&map);
 
     _pset.resize(SET_SIZE);
     _d_pset.resize(SET_SIZE);
+
+    _ray_sigma = ray_sigma;
+    _log_offset = log_offset;
 }
 
 void Particles::init_set() {
 
-    EigenMultivariateNormal<double, STATE_SIZE> mvn (_d_mean_prior, _d_cov_prior);
+    static EigenMultivariateNormal<double, STATE_SIZE> mvn(_d_mean_prior, _d_cov_prior);
+
+    mvn.setMean(_d_mean_prior);
+    mvn.setCovar(_d_cov_prior);
 
     for(int i=0; i<SET_SIZE; i++) {
         // random sample error states
@@ -45,27 +57,102 @@ void Particles::init_set() {
 
 void Particles::weight_set() {
     for(int i=0; i<SET_SIZE; i++) {
-        // transform cloud
-        tf::Matrix3x3 R;
-        tf::Vector3 t;
-        R.setRPY(_pset[i].state[3], _pset[i].state[4], _pset[i].state[5]);
-        t.setValue(_pset[i].state[6], _pset[i].state[7], _pset[i].state[8]);
-
-        Eigen::Matrix<double,4,4> transform;
-        Eigen::Matrix<double,3,3> rotation;
-        Eigen::Matrix<double,3,1> translation;
-        tf::matrixTFToEigen(R, rotation);
-        tf::vectorTFToEigen(t, translation);
-        transform << rotation, translation,
-                     0, 0, 0, 1;
-
+        // reproject cloud on to each particle
         pcl::PointCloud<pcl::PointXYZ> cloud_transformed;
-        pcl::transformPointCloud(_cloud, cloud_transformed, transform);
+        reproject_cloud(_pset[i], cloud_transformed);
 
         // weight particle
-
-        // compute weight sum
+        weight_particle(_pset[i], cloud_transformed);
     }
 
     // normalize weight
+    double weight_sum = 0.0;
+    for(int i=0; i<SET_SIZE; i++) {
+        weight_sum += exp(_pset[i].weight);
+    }
+    double log_weight_sum = log(weight_sum);
+    for(int i=0; i<SET_SIZE; i++) {
+        _pset[i].weight -= log_weight_sum;
+    }
+
+    // transfer weights to error state particles
+    for(int i=0; i<SET_SIZE; i++) {
+        _d_pset[i].weight = _pset[i].weight;
+    }
+}
+
+void Particles::reproject_cloud(Particle &p, pcl::PointCloud<pcl::PointXYZ> &cloud) {
+
+    // transform cloud
+    tf::Matrix3x3 R;
+    tf::Vector3 t;
+    R.setRPY(p.state[3], p.state[4], p.state[5]);
+    t.setValue(p.state[6], p.state[7], p.state[8]);
+
+    Eigen::Matrix<double,4,4> transform;
+    Eigen::Matrix<double,3,3> rotation;
+    Eigen::Matrix<double,3,1> translation;
+    tf::matrixTFToEigen(R, rotation);
+    tf::vectorTFToEigen(t, translation);
+    transform << rotation, translation,
+                 0, 0, 0, 1;
+
+    pcl::transformPointCloud(*_cloud_ptr, cloud, transform);
+}
+
+void Particles::weight_particle(Particle &p, pcl::PointCloud<pcl::PointXYZ> &cloud) {
+    for(int i=0; i<cloud.size(); i++) {
+        // the end point of one ray
+        octomap::point3d end_pnt(cloud[i].x, cloud[i].y, cloud[i].z);
+
+        // look up the distance to nearest obstacle
+        double dist = _map_ptr->get_dist_map()->getDist(end_pnt);
+
+        // lookup grid type
+        char grid_flag = _map_ptr->get_dist_map()->getGridMask(end_pnt);
+
+        // find weight through normal distribution
+        if(grid_flag != 2) {
+            if(dist >= 0.0 && dist <= 2.0*_ray_sigma) {
+                p.weight += log_likelihood(dist, _ray_sigma);
+            } else {
+                p.weight += log_likelihood(2.0*_ray_sigma, _ray_sigma);
+            }
+        } else {
+            if(dist >= 0.0 && dist <= 0.5*_ray_sigma) {
+                p.weight += log_likelihood(dist, _ray_sigma);
+            } else {
+                p.weight += log_likelihood(0.5*_ray_sigma, _ray_sigma);
+            }
+        }
+
+        // offset weight for numerical stabilization
+        p.weight += _log_offset;
+
+    }
+}
+
+void Particles::get_posterior() {
+
+    for(int i=0; i<SET_SIZE; i++) {
+        _d_mean_posterior += exp(_d_pset[i].weight) * _d_pset[i].state / SET_SIZE;
+    }
+    for(int i=0; i<SET_SIZE; i++) {
+        _d_cov_posterior += (_d_pset[i].state - _d_mean_posterior) * (_d_pset[i].state - _d_mean_posterior).transpose();
+    }
+}
+
+void Particles::propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean, Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov) {
+
+    // generate particles
+    init_set();
+
+    // weight each particles
+    weight_set();
+
+    // compute weighted mean and cov
+    get_posterior();
+
+    mean = _d_mean_posterior;
+    cov  = _d_cov_posterior;
 }
