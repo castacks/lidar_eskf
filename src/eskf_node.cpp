@@ -11,4 +11,3 @@ int main(int argc, char **argv) {
     GPF gpf(n, map);
 
 }
-
