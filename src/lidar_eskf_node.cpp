@@ -6,8 +6,11 @@ int main(int argc, char **argv) {
     ros::init(argc, argv, "lidar_eskf_node");
     ros::NodeHandle n("~");
 
-    DistMap map(n);
+    boost::shared_ptr<DistMap> map_ptr = boost::shared_ptr<DistMap>(new DistMap(n));
     ESKF eskf(n);
-    GPF gpf(n, map);
+    GPF gpf(n, map_ptr);
+
+    ros::spin();
+    return 0;
 
 }

@@ -4,31 +4,27 @@ inline double log_likelihood(double x, double sigma) {
     return -0.91893853320467274178 - log(sigma) - 0.5 * pow(x/sigma, 2.0);
 }
 
-Particles::Particles(Eigen::Matrix<double, STATE_SIZE, 1> &mean,
+Particles::Particles(ros::NodeHandlePtr nh_ptr,
+                     Eigen::Matrix<double, STATE_SIZE, 1> &mean,
                      Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov,
-                     pcl::PointCloud<pcl::PointXYZ> &cloud,
-                     DistMap &map,
-                     double ray_sigma,
-                     double log_offset) {
+                     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr,
+                     boost::shared_ptr<DistMap> map_ptr) : _cloud_ptr(cloud_ptr), _map_ptr(map_ptr)
+{
     _mean_prior.setZero();
     _mean_posterior.setZero();
     _d_mean_prior.setZero();
     _d_mean_posterior.setZero();
-    _d_cov_prior.setZero();
-    _d_cov_posterior.setZero();
+    _d_cov_prior = Eigen::MatrixXd::Identity(STATE_SIZE,STATE_SIZE);
+    _d_cov_posterior = Eigen::MatrixXd::Identity(STATE_SIZE,STATE_SIZE);
 
     _mean_prior = mean;
     _d_cov_prior = cov;
 
-    // strong pointers to cloud and map
-    _cloud_ptr.reset(&cloud);
-    _map_ptr.reset(&map);
-
     _pset.resize(SET_SIZE);
     _d_pset.resize(SET_SIZE);
 
-    _ray_sigma = ray_sigma;
-    _log_offset = log_offset;
+    nh_ptr->param("ray_sigma", _ray_sigma, 1.0);
+    nh_ptr->param("log_offset", _log_offset, 300.0);
 }
 
 void Particles::init_set() {
@@ -155,4 +151,12 @@ void Particles::propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean, Eigen::Mat
 
     mean = _d_mean_posterior;
     cov  = _d_cov_posterior;
+}
+
+std::vector<Particle> Particles::get_pset() {
+    return _pset;
+}
+
+std::vector<Particle> Particles::get_d_pset() {
+    return _d_pset;
 }

@@ -24,12 +24,11 @@ struct Particle {
 
 class Particles {
 public:
-    Particles(Eigen::Matrix<double, STATE_SIZE, 1> &mean,
+    Particles(ros::NodeHandlePtr nh_ptr,
+              Eigen::Matrix<double, STATE_SIZE, 1> &mean,
               Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov,
-              pcl::PointCloud<pcl::PointXYZ> &cloud,
-              DistMap &map,
-              double ray_sigma,
-              double log_offset);
+              pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr,
+              boost::shared_ptr<DistMap> map_ptr);
     ~Particles() {}
 
     void init_set();
@@ -41,6 +40,10 @@ public:
     void weight_particle(Particle &p, pcl::PointCloud<pcl::PointXYZ> &cloud);
 
     void propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean, Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov);
+
+    std::vector<Particle> get_pset();
+    std::vector<Particle> get_d_pset();
+
 private:
     std::vector<Particle> _pset;
     std::vector<Particle> _d_pset;

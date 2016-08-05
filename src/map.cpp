@@ -2,7 +2,7 @@
 
 DistMap::DistMap(ros::NodeHandle &nh) {
 
-    nh.param("map_file_dist", _map_file_name, std::string("nsh_1109.bt"));
+    nh.param("map_file_name", _map_file_name, std::string("nsh_1109.bt"));
     nh.param("octree_resolution", _octree_resolution, 0.05);
     nh.param("max_obstacle_dist", _max_obstacle_dist, 0.5);
     read_mapfile();
@@ -13,6 +13,7 @@ void DistMap::read_mapfile() {
     std::fstream mapFile(_map_file_name.c_str(), std::ios_base::binary | std::ios_base::in);
 
     if (mapFile.is_open()) {
+        ROS_INFO("DistMap: loading binary map.");
         _map_ptr = boost::shared_ptr<octomap::OcTree> (new octomap::OcTree (_octree_resolution));
         _map_ptr->readBinary(_map_file_name);
 
@@ -56,7 +57,12 @@ void DistMap::init_dist_map() {
                       new MapModel ( float ( _max_obstacle_dist ), & ( *_map_ptr ), min, max, false ) );
 
     _dist_map_ptr->update();
+
+    ROS_INFO("DistMap: min = %0.3f %0.3f %0.3f; max = %0.3f %0.3f %0.3f",
+             min(0), min(1), min(2), max(0), max(1), max(2));
     ROS_INFO("DistMap: initialization done!");
+
+
 }
 
 double DistMap::ray_casting(octomap::point3d endPt, octomap::point3d originPt, octomap::point3d &rayEndPt) {

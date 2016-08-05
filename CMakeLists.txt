@@ -68,4 +68,9 @@ add_library(gpf src/gpf.cpp)
 target_link_libraries(gpf ${catkin_LIBRARIES})
 
 add_executable(eskf_test src/eskf_test.cpp)
-target_link_libraries(eskf_test eskf map gpf ${catkin_LIBRARIES}  )
+target_link_libraries(eskf_test eskf ${catkin_LIBRARIES})
+add_executable(gpf_test src/gpf_test.cpp)
+target_link_libraries(gpf_test map gpf particles ${catkin_LIBRARIES} ${PCL_LIBRARY_DIRS})
+
+add_executable(lidar_eskf_node src/lidar_eskf_node.cpp)
+target_link_libraries(lidar_eskf_node eskf map gpf particles ${catkin_LIBRARIES}  )

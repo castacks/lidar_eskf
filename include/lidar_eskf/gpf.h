@@ -8,20 +8,24 @@
 #include <pcl/keypoints/uniform_sampling.h>
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/conditional_removal.h>
+#include <visualization_msgs/MarkerArray.h>
 
 #include "lidar_eskf/particles.h"
 
 class GPF {
 public:
-    GPF(ros::NodeHandle &nh, DistMap &map);
+    GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr);
     ~GPF() {}
 
     void odom_callback(const nav_msgs::Odometry &msg);
     void cloud_callback(const sensor_msgs::PointCloud2 &msg);
 
     void downsample();
-    void recover_pseudo_meas();
+    void recover_meas();
     void check_posdef(Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &R);
+    void publish_meas();
+    void publish_pset(Particles p);
+    std::vector< std::vector<double> > compute_color(Particles pSet);
 
 private:
 
@@ -40,11 +44,14 @@ private:
     ros::Subscriber _cloud_sub;
     ros::Subscriber _odom_sub;
     ros::Publisher  _meas_pub;
+    ros::Publisher  _pset_pub;
 
     ros::Time _laser_time;
 
     boost::shared_ptr<DistMap> _map_ptr;
     pcl::PointCloud<pcl::PointXYZ>::Ptr _cloud_ptr;
+
+    ros::NodeHandlePtr _nh_ptr;
 
 };
 #endif // GPF_H
