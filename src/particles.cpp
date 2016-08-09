@@ -1,7 +1,7 @@
 #include "lidar_eskf/particles.h"
 
 inline double log_likelihood(double x, double sigma) {
-    return -0.91893853320467274178 - log(sigma) - 0.5 * pow(x/sigma, 2.0);
+    return -0.91893853320467274178 - log(sigma) - 0.5 * x * x / (sigma * sigma);
 }
 
 Particles::Particles(ros::NodeHandlePtr nh_ptr,
@@ -24,7 +24,6 @@ Particles::Particles(ros::NodeHandlePtr nh_ptr,
     _d_pset.resize(SET_SIZE);
 
     nh_ptr->param("ray_sigma", _ray_sigma, 1.0);
-    nh_ptr->param("log_offset", _log_offset, 300.0);
 }
 
 void Particles::init_set() {
@@ -41,6 +40,7 @@ void Particles::init_set() {
 
         // recover nominal states
         _pset[i].state = _mean_prior + _d_pset[i].state;
+        _pset[i].weight = _d_pset[i].weight;
 
         // recover nominal states: rotation
         tf::Matrix3x3 rotation, d_rotation;
@@ -61,14 +61,28 @@ void Particles::weight_set() {
         weight_particle(_pset[i], cloud_transformed);
     }
 
+    // stabilize weights, offset weight values to [-800, 0] range
+    double max_weight(-INFINITY);
+    for(int i=0; i<SET_SIZE; i++) {
+        if(_pset[i].weight > max_weight) max_weight = _pset[i].weight;
+//        ROS_INFO("Particles: weight[%d] = %0.4f", i, _pset[i].weight);
+    }
+    for(int i=0; i<SET_SIZE; i++) {
+        _pset[i].weight -= max_weight;
+        if(_pset[i].weight < -50) _pset[i].weight = -50.0;
+//        ROS_INFO("Particles: weight[%d] = %0.6f", i, exp(_pset[i].weight));
+    }
+
     // normalize weight
     double weight_sum = 0.0;
     for(int i=0; i<SET_SIZE; i++) {
         weight_sum += exp(_pset[i].weight);
     }
+//    ROS_INFO("Particles: weight sum = %0.6f", weight_sum);
     double log_weight_sum = log(weight_sum);
     for(int i=0; i<SET_SIZE; i++) {
         _pset[i].weight -= log_weight_sum;
+//        ROS_INFO("Particles: weight[%d] = %0.6f", i, exp(_pset[i].weight));
     }
 
     // transfer weights to error state particles
@@ -83,7 +97,7 @@ void Particles::reproject_cloud(Particle &p, pcl::PointCloud<pcl::PointXYZ> &clo
     tf::Matrix3x3 R;
     tf::Vector3 t;
     R.setRPY(p.state[3], p.state[4], p.state[5]);
-    t.setValue(p.state[6], p.state[7], p.state[8]);
+    t.setValue(p.state[0], p.state[1], p.state[2]);
 
     Eigen::Matrix<double,4,4> transform;
     Eigen::Matrix<double,3,3> rotation;
@@ -121,10 +135,6 @@ void Particles::weight_particle(Particle &p, pcl::PointCloud<pcl::PointXYZ> &clo
                 p.weight += log_likelihood(0.5*_ray_sigma, _ray_sigma);
             }
         }
-
-        // offset weight for numerical stabilization
-        p.weight += _log_offset;
-
     }
 }
 

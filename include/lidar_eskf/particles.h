@@ -10,7 +10,7 @@
 #include "lidar_eskf/EigenMultivariateNormal.hpp"
 #include "lidar_eskf/map.h"
 
-#define SET_SIZE 500
+#define SET_SIZE 200
 #define STATE_SIZE 6
 
 struct Particle {
@@ -60,7 +60,6 @@ private:
     boost::shared_ptr<DistMap> _map_ptr;
 
     double _ray_sigma;
-    double _log_offset;
 
 };
 #endif // PARTICLES_H
