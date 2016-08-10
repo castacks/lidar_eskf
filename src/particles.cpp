@@ -3,12 +3,10 @@
 inline double log_likelihood(double x, double sigma) {
     return -0.91893853320467274178 - log(sigma) - 0.5 * x * x / (sigma * sigma);
 }
+static EigenMultivariateNormal<double, STATE_SIZE> mvn(Eigen::MatrixXd::Zero(STATE_SIZE,1),
+                                                       Eigen::MatrixXd::Identity(STATE_SIZE,STATE_SIZE));
 
-Particles::Particles(ros::NodeHandlePtr nh_ptr,
-                     Eigen::Matrix<double, STATE_SIZE, 1> &mean,
-                     Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov,
-                     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr,
-                     boost::shared_ptr<DistMap> map_ptr) : _cloud_ptr(cloud_ptr), _map_ptr(map_ptr)
+Particles::Particles(boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map_ptr)
 {
     _mean_prior.setZero();
     _mean_posterior.setZero();
@@ -17,18 +15,27 @@ Particles::Particles(ros::NodeHandlePtr nh_ptr,
     _d_cov_prior = Eigen::MatrixXd::Identity(STATE_SIZE,STATE_SIZE);
     _d_cov_posterior = Eigen::MatrixXd::Identity(STATE_SIZE,STATE_SIZE);
 
-    _mean_prior = mean;
-    _d_cov_prior = cov;
-
     _pset.resize(SET_SIZE);
     _d_pset.resize(SET_SIZE);
-
-    nh_ptr->param("ray_sigma", _ray_sigma, 1.0);
 }
 
-void Particles::init_set() {
+void Particles::set_cloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr) {
+    _cloud_ptr = cloud_ptr;
+}
 
-    static EigenMultivariateNormal<double, STATE_SIZE> mvn(_d_mean_prior, _d_cov_prior);
+void Particles::set_mean(Eigen::Matrix<double, STATE_SIZE, 1> &mean) {
+    _mean_prior = mean;
+}
+
+void Particles::set_cov(Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov) {
+    _d_cov_prior = cov;
+}
+
+void Particles::set_raysigma(double raysigma) {
+    _ray_sigma = raysigma;
+}
+
+void Particles::draw_set() {
 
     mvn.setMean(_d_mean_prior);
     mvn.setCovar(_d_cov_prior);
@@ -36,11 +43,12 @@ void Particles::init_set() {
     for(int i=0; i<SET_SIZE; i++) {
         // random sample error states
         mvn.nextSample(_d_pset[i].state);
+
         _d_pset[i].weight = log(1.0/SET_SIZE);
+        _pset[i].weight = _d_pset[i].weight;
 
         // recover nominal states
         _pset[i].state = _mean_prior + _d_pset[i].state;
-        _pset[i].weight = _d_pset[i].weight;
 
         // recover nominal states: rotation
         tf::Matrix3x3 rotation, d_rotation;
@@ -52,6 +60,7 @@ void Particles::init_set() {
 }
 
 void Particles::weight_set() {
+#pragma omp parallel for
     for(int i=0; i<SET_SIZE; i++) {
         // reproject cloud on to each particle
         pcl::PointCloud<pcl::PointXYZ> cloud_transformed;
@@ -61,16 +70,14 @@ void Particles::weight_set() {
         weight_particle(_pset[i], cloud_transformed);
     }
 
-    // stabilize weights, offset weight values to [-800, 0] range
+    // stabilize weights, offset weight values to [-50.0, 0.0] range
     double max_weight(-INFINITY);
     for(int i=0; i<SET_SIZE; i++) {
         if(_pset[i].weight > max_weight) max_weight = _pset[i].weight;
-//        ROS_INFO("Particles: weight[%d] = %0.4f", i, _pset[i].weight);
     }
     for(int i=0; i<SET_SIZE; i++) {
         _pset[i].weight -= max_weight;
-        if(_pset[i].weight < -50) _pset[i].weight = -50.0;
-//        ROS_INFO("Particles: weight[%d] = %0.6f", i, exp(_pset[i].weight));
+        if(_pset[i].weight < -50.0) _pset[i].weight = -50.0;
     }
 
     // normalize weight
@@ -78,32 +85,28 @@ void Particles::weight_set() {
     for(int i=0; i<SET_SIZE; i++) {
         weight_sum += exp(_pset[i].weight);
     }
-//    ROS_INFO("Particles: weight sum = %0.6f", weight_sum);
     double log_weight_sum = log(weight_sum);
     for(int i=0; i<SET_SIZE; i++) {
         _pset[i].weight -= log_weight_sum;
-//        ROS_INFO("Particles: weight[%d] = %0.6f", i, exp(_pset[i].weight));
-    }
-
-    // transfer weights to error state particles
-    for(int i=0; i<SET_SIZE; i++) {
         _d_pset[i].weight = _pset[i].weight;
     }
+
 }
 
 void Particles::reproject_cloud(Particle &p, pcl::PointCloud<pcl::PointXYZ> &cloud) {
 
     // transform cloud
-    tf::Matrix3x3 R;
-    tf::Vector3 t;
-    R.setRPY(p.state[3], p.state[4], p.state[5]);
-    t.setValue(p.state[0], p.state[1], p.state[2]);
+    Eigen::Matrix4d transform;
+    Eigen::Matrix3d rotation;
+    Eigen::Vector3d translation;
 
-    Eigen::Matrix<double,4,4> transform;
-    Eigen::Matrix<double,3,3> rotation;
-    Eigen::Matrix<double,3,1> translation;
-    tf::matrixTFToEigen(R, rotation);
-    tf::vectorTFToEigen(t, translation);
+    translation << p.state[0],
+                   p.state[1],
+                   p.state[2];
+
+    rotation = Eigen::AngleAxisd(p.state[3], Eigen::Vector3d(1.0,0.0,0.0))
+             * Eigen::AngleAxisd(p.state[4], Eigen::Vector3d(0.0,1.0,0.0))
+             * Eigen::AngleAxisd(p.state[5], Eigen::Vector3d(0.0,0.0,1.0));
     transform << rotation, translation,
                  0, 0, 0, 1;
 
@@ -116,10 +119,10 @@ void Particles::weight_particle(Particle &p, pcl::PointCloud<pcl::PointXYZ> &clo
         octomap::point3d end_pnt(cloud[i].x, cloud[i].y, cloud[i].z);
 
         // look up the distance to nearest obstacle
-        double dist = _map_ptr->get_dist_map()->getDist(end_pnt);
+        double dist = _map_ptr->get_dist(end_pnt);
 
         // lookup grid type
-        char grid_flag = _map_ptr->get_dist_map()->getGridMask(end_pnt);
+        char grid_flag = _map_ptr->get_gridmask(end_pnt);
 
         // find weight through normal distribution
         if(grid_flag != 2) {
@@ -140,18 +143,21 @@ void Particles::weight_particle(Particle &p, pcl::PointCloud<pcl::PointXYZ> &clo
 
 void Particles::get_posterior() {
 
+    _d_mean_posterior.setZero();
+    _d_cov_posterior.setZero();
+
     for(int i=0; i<SET_SIZE; i++) {
-        _d_mean_posterior += exp(_d_pset[i].weight) * _d_pset[i].state / SET_SIZE;
+        _d_mean_posterior += exp(_d_pset[i].weight) * _d_pset[i].state;
     }
     for(int i=0; i<SET_SIZE; i++) {
-        _d_cov_posterior += (_d_pset[i].state - _d_mean_posterior) * (_d_pset[i].state - _d_mean_posterior).transpose();
+        _d_cov_posterior += exp(_d_pset[i].weight) * (_d_pset[i].state - _d_mean_posterior) * (_d_pset[i].state - _d_mean_posterior).transpose();
     }
 }
 
 void Particles::propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean, Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov) {
 
     // generate particles
-    init_set();
+    draw_set();
 
     // weight each particles
     weight_set();

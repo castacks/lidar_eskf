@@ -146,6 +146,8 @@ public:
     */
     double ray_casting(octomap::point3d endPt, octomap::point3d originPt, octomap::point3d &rayEndPt);
 
+    double get_dist(octomap::point3d p);
+    char get_gridmask(octomap::point3d p);
 
 
 private:

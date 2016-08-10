@@ -50,8 +50,15 @@ private:
 
     boost::shared_ptr<DistMap> _map_ptr;
     pcl::PointCloud<pcl::PointXYZ>::Ptr _cloud_ptr;
-
     ros::NodeHandlePtr _nh_ptr;
+
+    boost::shared_ptr<Particles> _particles_ptr;
+
+    double _cloud_resol;
+    double _ray_sigma;
+
+    /* test */
+    ros::Publisher _post_pub;
 
 };
 #endif // GPF_H

@@ -79,3 +79,10 @@ double DistMap::ray_casting(octomap::point3d endPt, octomap::point3d originPt, o
     }
     return dist;
 }
+
+double DistMap::get_dist(octomap::point3d p) {
+    return _dist_map_ptr->getDist(p);
+}
+char DistMap::get_gridmask(octomap::point3d p) {
+    return _dist_map_ptr->getGridMask(p);
+}

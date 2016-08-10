@@ -10,7 +10,9 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _mean_posterior.setZero();
     _mean_meas.setZero();
 
-    _cov_prior = 0.1 * Eigen::MatrixXd::Identity(6, 6);
+    Eigen::Matrix<double, 1, 6> sigma;
+    sigma << 0.1, 0.1, 0.1, 0.0001, 0.0001, 0.0001;
+    _cov_prior = sigma.asDiagonal();
     _cov_posterior.setZero();
     _cov_meas.setZero();
 
@@ -18,8 +20,13 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _odom_sub = nh.subscribe("odom", 100, &GPF::odom_callback, this);
     _meas_pub = nh.advertise<nav_msgs::Odometry>("meas", 100);
     _pset_pub = nh.advertise<visualization_msgs::MarkerArray>("marker", 10);
+    _post_pub = nh.advertise<nav_msgs::Odometry>("posterior", 100);
 
-    _nh_ptr.reset(&nh);
+    // initialize particles pointer
+    nh.param("ray_sigma", _ray_sigma, 1.0);
+    nh.param("cloud_resolution", _cloud_resol, 0.2);
+    _particles_ptr = boost::shared_ptr<Particles> (new Particles(map_ptr));
+    _particles_ptr->set_raysigma(_ray_sigma);
 }
 
 void GPF::odom_callback(const nav_msgs::Odometry &msg) {
@@ -63,15 +70,38 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::fromROSMsg(msg, *cloud_ptr);
     _cloud_ptr = cloud_ptr;
+
     downsample();
+    ROS_INFO("GPF: cloud size = %d", (int)_cloud_ptr->size());
 
-    Particles pset(_nh_ptr, _mean_prior, _cov_prior, _cloud_ptr, _map_ptr);
-    pset.propagate(_mean_posterior, _cov_posterior);
-    publish_pset(pset);
-    ROS_INFO("GPF: posterior: [%0.3f, %0.3f, %0.3f, %0.3f, %0.3f, %0.3f]",_mean_posterior[0],_mean_posterior[1],_mean_posterior[2],_mean_posterior[3],_mean_posterior[4],_mean_posterior[5]);
+    _particles_ptr->set_mean(_mean_prior);
+    _particles_ptr->set_cov(_cov_prior);
+    _particles_ptr->set_cloud(_cloud_ptr);
+    _particles_ptr->propagate(_mean_posterior, _cov_posterior);
+    publish_pset(*_particles_ptr);
 
-//    recover_meas();
-//    publish_meas();
+    nav_msgs::Odometry pmsg;
+    pmsg.header.frame_id = "world";
+    pmsg.header.stamp = _laser_time;
+    pmsg.pose.pose.position.x = _mean_posterior[0];
+    pmsg.pose.pose.position.y = _mean_posterior[1];
+    pmsg.pose.pose.position.z = _mean_posterior[2];
+    tf::Quaternion q;
+    q.setRPY(_mean_posterior[3], _mean_posterior[4], _mean_posterior[5]);
+    pmsg.pose.pose.orientation.x = q.x();
+    pmsg.pose.pose.orientation.y = q.y();
+    pmsg.pose.pose.orientation.z = q.z();
+    pmsg.pose.pose.orientation.w = q.w();
+
+    for(int i=0; i<STATE_SIZE; i++) {
+        for(int j=0; j<STATE_SIZE; j++) {
+            pmsg.pose.covariance[6*i+j] = _cov_posterior(i,j);
+        }
+    }
+    _post_pub.publish(pmsg);
+
+    recover_meas();
+    publish_meas();
 }
 
 void GPF::downsample() {
@@ -84,11 +114,9 @@ void GPF::downsample() {
     pcl::PointCloud<int> sampled_indices;
     pcl::UniformSampling<pcl::PointXYZ> uniform_sampling;
     uniform_sampling.setInputCloud(_cloud_ptr);
-    uniform_sampling.setRadiusSearch(0.1);
+    uniform_sampling.setRadiusSearch(_cloud_resol);
     uniform_sampling.compute(sampled_indices);
     pcl::copyPointCloud (*_cloud_ptr, sampled_indices.points, *unif_cloud);
-
-//    ROS_INFO("GPF: downsample: cloud size = %d, unif size = %d", (int) _cloud_ptr->size(), (int)unif_cloud->size());
 
     // truncating in range
     double rangeLim = 15.0;
@@ -162,7 +190,7 @@ void GPF::check_posdef(Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &R) {
             E(ii,ii) = scl(ii,0);
         }
         else {
-            E(ii,ii) = 100.0;
+            E(ii,ii) = 10.0;
         }
     }
     R = rot * E * rot.inverse();
@@ -243,8 +271,8 @@ std::vector< std::vector<double> > GPF::compute_color(Particles pSet) {
     std::vector< std::vector<double> > color;
 
     // find maximum and minimum weight
-    double minWeight = 9999.9;
-    double maxWeight = -9999.9;
+    double minWeight = 99.9;
+    double maxWeight = -99.9;
 
     for(int i=0; i<SET_SIZE; i++) {
         Particle p = particle[i];
@@ -252,8 +280,6 @@ std::vector< std::vector<double> > GPF::compute_color(Particles pSet) {
         if(p.weight < minWeight) minWeight = p.weight;
     }
     double midWeight = (maxWeight + minWeight)/2.0;
-
-//    ROS_INFO("max %0.4f; min: %0.4f; mid: %0.4f", maxWeight, minWeight, midWeight);
 
     // compute color for each particle
     for(int i=0; i<particle.size(); i++) {

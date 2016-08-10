@@ -2,19 +2,16 @@
 <launch>
 
 	<param name="use_sim_time" value="true" />
-	
-    <!-- <node pkg="rosbag" type="play" name="playbag" output="screen"
-          args="-pause -clock -rate 1 -u 8
-                $(find lidar_eskf)/dat/imu_laser_2016-07-19-02-58-12_0.bag"/> -->
                 
 	<node pkg="tf" type="static_transform_publisher" name="world_view" args="0 0 0 0 0 3.1415926 world world_view 100"/> 
 	
 	<node pkg="lidar_eskf" type="eskf_test" name="eskf_test" output="screen">
 	
 	    <remap from="/imu"                      to="/dji_sim/imu"/>
-	    <remap from="/measurements"             to="/eskf_test/fake_measurements"/>
+	    <remap from="/meas"                     to="/fake_meas"/>
 	    
-	    <remap from="/eskf_test/fake_odom"      to="/dji_sim/odometry"/>
+	    <remap from="/odom"                     to="/eskf_test/odom"/>
+	    <remap from="/fake_odom"      to="/dji_sim/odometry"/>
 	    
         <param name="imu_frequency"             value="100"/>
         <param name="sigma_acceleration"        value="0.8"/>
@@ -27,9 +24,9 @@
         <param name="init_bias_acc_y"           value="-0.05"/>
         <param name="init_bias_acc_z"           value="0.02"/> -->
         
-        <param name="init_bias_acc_x"           value="0.15"/>
-        <param name="init_bias_acc_y"           value="0.1"/>
-        <param name="init_bias_acc_z"           value="-0.25"/>
+        <param name="init_bias_acc_x"           value="0.0"/>
+        <param name="init_bias_acc_y"           value="0.0"/>
+        <param name="init_bias_acc_z"           value="0.0"/>
         
         <param name="position_sigma"            value="0.2"/>
         <param name="rotation_sigma"            value="0.5"/>

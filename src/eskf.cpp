@@ -63,6 +63,7 @@ ESKF::ESKF(ros::NodeHandle &nh) {
 
     // initialize covariance matrix
     _Sigma.setZero();
+    _Sigma.block<3,3>(6,6) = 0.1 * Eigen::MatrixXd::Identity(3, 3);
     _Q.setZero();
 
     // gravity
@@ -73,8 +74,8 @@ ESKF::ESKF(ros::NodeHandle &nh) {
 
     // subscriber and publisher
     _imu_sub = nh.subscribe("/imu", 50, &ESKF::imu_callback, this);
-    _meas_sub = nh.subscribe("/measurements", 50, &ESKF::measurement_callback, this);
-    _odom_pub = nh.advertise<nav_msgs::Odometry>("imu_odom", 50, true);
+    _meas_sub = nh.subscribe("/meas", 50, &ESKF::measurement_callback, this);
+    _odom_pub = nh.advertise<nav_msgs::Odometry>("odom", 50, true);
     _bias_pub = nh.advertise<geometry_msgs::TwistStamped>("bias", 50, true);
     // acc queue
     _acc_queue_count = 0;
