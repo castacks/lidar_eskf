@@ -11,9 +11,11 @@ Particles::Particles(boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map_ptr)
     _mean_prior.setZero();
     _mean_posterior.setZero();
     _d_mean_prior.setZero();
+    _d_mean_sample.setZero();
     _d_mean_posterior.setZero();
-    _d_cov_prior = Eigen::MatrixXd::Identity(STATE_SIZE,STATE_SIZE);
-    _d_cov_posterior = Eigen::MatrixXd::Identity(STATE_SIZE,STATE_SIZE);
+    _d_cov_prior.setZero();
+    _d_cov_sample.setZero();
+    _d_cov_posterior.setZero();
 
     _pset.resize(SET_SIZE);
     _d_pset.resize(SET_SIZE);
@@ -56,6 +58,16 @@ void Particles::draw_set() {
         d_rotation.setRPY(_d_pset[i].state[3], _d_pset[i].state[4], _d_pset[i].state[5]);
         rotation  = rotation * d_rotation;
         rotation.getRPY(_pset[i].state[3], _pset[i].state[4], _pset[i].state[5]);
+    }
+
+    _d_mean_sample.setZero();
+    _d_cov_sample.setZero();
+
+    for(int i=0; i<SET_SIZE; i++) {
+        _d_mean_sample += _d_pset[i].state / SET_SIZE;
+    }
+    for(int i=0; i<SET_SIZE; i++) {
+        _d_cov_sample += (_d_pset[i].state - _d_mean_sample)*(_d_pset[i].state - _d_mean_sample).transpose() / SET_SIZE;
     }
 }
 
@@ -154,7 +166,10 @@ void Particles::get_posterior() {
     }
 }
 
-void Particles::propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean, Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov) {
+void Particles::propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean_prior,
+                          Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov_prior,
+                          Eigen::Matrix<double, STATE_SIZE, 1> &mean_posterior,
+                          Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov_posterior) {
 
     // generate particles
     draw_set();
@@ -165,8 +180,10 @@ void Particles::propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean, Eigen::Mat
     // compute weighted mean and cov
     get_posterior();
 
-    mean = _d_mean_posterior;
-    cov  = _d_cov_posterior;
+    mean_prior = _d_mean_sample;
+    cov_prior = _d_cov_sample;
+    mean_posterior = _d_mean_posterior;
+    cov_posterior  = _d_cov_posterior;
 }
 
 std::vector<Particle> Particles::get_pset() {

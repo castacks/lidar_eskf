@@ -8,14 +8,10 @@
 	<node pkg="lidar_eskf" type="eskf_test" name="eskf_test" output="screen">
 	
 	    <remap from="/imu"                      to="/dji_sim/imu"/>
-	    <remap from="/meas"                     to="/fake_meas"/>
-	    
-	    <remap from="/odom"                     to="/eskf_test/odom"/>
-	    <remap from="/fake_odom"      to="/dji_sim/odometry"/>
 	    
         <param name="imu_frequency"             value="100"/>
         <param name="sigma_acceleration"        value="0.8"/>
-        <param name="sigma_gyroscop"            value="0.01"/>
+        <param name="sigma_gyroscop"            value="0.1"/>
         <param name="sigma_acceleration_bias"   value="0.2"/>
         <param name="sigma_gyroscope_bias"      value="0.1"/>
         <param name="gravity"                   value="9.82"/>
@@ -28,8 +24,8 @@
         <param name="init_bias_acc_y"           value="0.0"/>
         <param name="init_bias_acc_z"           value="0.0"/>
         
-        <param name="position_sigma"            value="0.2"/>
-        <param name="rotation_sigma"            value="0.5"/>
+        <param name="position_sigma"            value="0.3"/>
+        <param name="rotation_sigma"            value="0.1"/>
         
         <param name="acc_queue_size"            value="10"/>
         

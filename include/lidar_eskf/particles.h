@@ -39,7 +39,10 @@ public:
     void reproject_cloud(Particle &p, pcl::PointCloud<pcl::PointXYZ> &cloud);
     void weight_particle(Particle &p, pcl::PointCloud<pcl::PointXYZ> &cloud);
 
-    void propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean, Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov);
+    void propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean_prior,
+                   Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov_prior,
+                   Eigen::Matrix<double, STATE_SIZE, 1> &mean_posterior,
+                   Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov_posterior);
 
     std::vector<Particle> get_pset();
     std::vector<Particle> get_d_pset();
@@ -53,6 +56,8 @@ private:
 
     Eigen::Matrix<double, STATE_SIZE, 1> _d_mean_prior;
     Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> _d_cov_prior;
+    Eigen::Matrix<double, STATE_SIZE, 1> _d_mean_sample;
+    Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> _d_cov_sample;
     Eigen::Matrix<double, STATE_SIZE, 1> _d_mean_posterior;
     Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> _d_cov_posterior;
 

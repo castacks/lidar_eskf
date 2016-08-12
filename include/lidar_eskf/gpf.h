@@ -31,6 +31,8 @@ private:
 
     Eigen::Matrix<double, 6, 1> _mean_prior;
     Eigen::Matrix<double, 6, 6> _cov_prior;
+    Eigen::Matrix<double, 6, 1> _mean_sample;
+    Eigen::Matrix<double, 6, 6> _cov_sample;
     Eigen::Matrix<double, 6, 1> _mean_posterior;
     Eigen::Matrix<double, 6, 6> _cov_posterior;
     Eigen::Matrix<double, 6, 1> _mean_meas;

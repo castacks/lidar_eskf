@@ -8,7 +8,6 @@
 	<node pkg="lidar_eskf" type="gpf_test" name="gpf_test" output="screen">
 	
 	    <remap from="/gpf_test/cloud"            to="/dji_sim/laser/pointcloud"/>
-	    <remap from="/gpf_test/odom"             to="/gpf_test/fake_odom"/>
         
         <param name="map_file_name"            value="$(find lidar_eskf)/map/gazebo_bridge.bt"/>
         <param name="octree_resolution"        value="0.2"/>

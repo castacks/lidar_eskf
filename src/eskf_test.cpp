@@ -85,11 +85,11 @@ int main(int argc, char **argv)
     rotation.setIdentity();
     quaternion.setRPY(0.0,0.0,0.0);
 
-    fake_meas_pub = n.advertise<nav_msgs::Odometry>("/fake_meas", 50, true);
-    imu_odom_sub  = n.subscribe("/odom", 50, &imu_odom_callback);
-    fake_odom_sub = n.subscribe("/fake_odom", 50, &fake_odom_callback);
+    fake_meas_pub = n.advertise<nav_msgs::Odometry>("/meas", 50, true);
+    imu_odom_sub  = n.subscribe("/eskf_test/odom", 50, &imu_odom_callback);
+    fake_odom_sub = n.subscribe("/dji_sim/odometry", 50, &fake_odom_callback);
 
-    ros::Timer timer = n.createTimer(ros::Duration(0.5), publish_fake_measure);
+    ros::Timer timer = n.createTimer(ros::Duration(0.03), publish_fake_measure);
     ESKF eskf(n);
 
     ros::spin();

@@ -63,7 +63,7 @@ ESKF::ESKF(ros::NodeHandle &nh) {
 
     // initialize covariance matrix
     _Sigma.setZero();
-    _Sigma.block<3,3>(6,6) = 0.1 * Eigen::MatrixXd::Identity(3, 3);
+//    _Sigma.block<3,3>(3,3) = 0.01 * Eigen::MatrixXd::Identity(3, 3);
     _Q.setZero();
 
     // gravity
@@ -186,22 +186,22 @@ void ESKF::propagate_covariance() {
     tf::matrixTFToEigen(skew(_imu_acceleration - _bias_acc), R_1);
     tf::matrixTFToEigen(vec_to_rot((_imu_angular_velocity - _bias_gyr) * _dt), R_2);
 
-    _Fx <<     I,        -R*R_1*_dt,   Z,   -R*_dt,        Z,
-               Z,   R_2.transpose(),   Z,        Z,   -I*_dt,
-           I*_dt,                 Z,   I,        Z,        Z,
-               Z,                 Z,   Z,        I,        Z,
-               Z,                 Z,   Z,        Z,        I;
+    _Fx <<     I,      Z,       -R*R_1*_dt,   -R*_dt,        Z,
+           I*_dt,      I,                Z,        Z,        Z,
+               Z,      Z,  R_2.transpose(),        Z,   -I*_dt,
+               Z,      Z,                Z,        I,        Z,
+               Z,      Z,                Z,        Z,        I;
 
     _Fn << R, Z, Z, Z,
-           Z, I, Z, Z,
            Z, Z, Z, Z,
+           Z, I, Z, Z,
            Z, Z, I, Z,
            Z, Z, Z, I;
 
-    _Q << pow(_sigma_acc * _dt, 2.0) * I, Z, Z, Z,
-          Z, pow(_sigma_gyr * _dt, 2.0) * I, Z, Z,
-          Z, Z, pow(_sigma_bias_acc * _dt, 2.0) * I, Z,
-          Z, Z, Z, pow(_sigma_bias_gyr * _dt, 2.0) * I;
+    _Q << pow(_sigma_acc, 2.0) * I, Z, Z, Z,
+          Z, pow(_sigma_gyr, 2.0) * I, Z, Z,
+          Z, Z, pow(_sigma_bias_acc, 2.0) * I, Z,
+          Z, Z, Z, pow(_sigma_bias_gyr, 2.0) * I;
 
     // update covariance
     _Sigma = _Fx * _Sigma * _Fx.transpose() + _Fn * _Q * _Fn.transpose();
@@ -233,11 +233,10 @@ void ESKF::publish_odom() {
     Eigen::Matrix<double, 3, 3> R;
     tf::matrixTFToEigen(_rotation, R);
 
-    pose_sigma <<     _Sigma.block<3,3>(6,6),     _Sigma.block<3,3>(3,6) * R.transpose(),
-                  R * _Sigma.block<3,3>(6,3), R * _Sigma.block<3,3>(3,3) * R.transpose();
+    pose_sigma << _Sigma.block<6,6>(3,3);
 
-    twist_sigma <<        _Sigma.block<3,3>(0,0),                      Eigen::MatrixXd::Zero(3,3) * R.transpose(),
-                  R * Eigen::MatrixXd::Zero(3,3), R * _sigma_gyr * Eigen::MatrixXd::Identity(3,3) * R.transpose();
+    twist_sigma << _Sigma.block<3,3>(0,0),      Eigen::MatrixXd::Zero(3,3),
+                   Eigen::MatrixXd::Zero(3,3), _sigma_gyr * Eigen::MatrixXd::Identity(3,3);
 
     for(int i=0; i<6; i++) {
         for(int j=0; j<6; j++) {
@@ -245,9 +244,6 @@ void ESKF::publish_odom() {
             msg.twist.covariance[6*i+j] = twist_sigma(i, j);
         }
     }
-
-//    std::cout << "eskf: pose sigma = " <<std::endl;
-//    std::cout << pose_sigma << std::endl;
 
     // publish message
     _odom_pub.publish(msg);
@@ -307,27 +303,20 @@ void ESKF::update_error() {
 
     // measurements
     Eigen::Matrix<double, 6, 1> y;
-    y[0] = _m_theta.x();    y[1] = _m_theta.y();    y[2] = _m_theta.z();
-    y[3] = _m_position.x(); y[4] = _m_position.y(); y[5] = _m_position.z();
-
-    // state
-    Eigen::Matrix<double, 15, 1> x;
-    x[0] = _d_velocity.x();  x[1] = _d_velocity.y();  x[2] = _d_velocity.z();
-    x[3] = _d_theta.x();     x[4] = _d_theta.y();     x[5] = _d_theta.z();
-    x[6] = _d_position.x();  x[7] = _d_position.y();  x[8] = _d_position.z();
-    x[9] = _d_bias_acc.x();  x[10] = _d_bias_acc.y(); x[11] = _d_bias_acc.z();
-    x[12] = _d_bias_gyr.x(); x[13] = _d_bias_gyr.y(); x[14] = _d_bias_gyr.z();
+    y[0] = _m_position.x(); y[1] = _m_position.y(); y[2] = _m_position.z();
+    y[3] = _m_theta.x();    y[4] = _m_theta.y();    y[5] = _m_theta.z();
 
     // kalman gain matrix
     Eigen::Matrix<double, 15, 6> K;
     K = _Sigma * H.transpose() * (H * _Sigma * H.transpose() + _m_pose_sigma).inverse();
 
     // update error
-    x = K * (y - H * x);
+    Eigen::Matrix<double, 15, 1> x;
+    x = K * y;
 
     _d_velocity.setValue(x[0],  x[1],  x[2]);
-    _d_theta.setValue(   x[3],  x[4],  x[5]);
-    _d_position.setValue(x[6],  x[7],  x[8]);
+    _d_position.setValue(x[3],  x[4],  x[5]);
+    _d_theta.setValue(   x[6],  x[7],  x[8]);
     _d_bias_acc.setValue(x[9],  x[10], x[11]);
     _d_bias_gyr.setValue(x[12], x[13], x[14]);
 
@@ -342,8 +331,8 @@ void ESKF::update_error() {
 
 void ESKF::update_state() {
     _velocity += _d_velocity;
-    _rotation *= _d_rotation;
     _position += _d_position;
+    _rotation *= _d_rotation;
     _bias_acc += _d_bias_acc;
     _bias_gyr += _d_bias_gyr;
 
@@ -352,9 +341,9 @@ void ESKF::update_state() {
 
 void ESKF::reset_error() {
     _d_velocity.setZero();
+    _d_position.setZero();
     _d_theta.setZero();
     _d_rotation.setIdentity();
-    _d_position.setZero();
     _d_bias_acc.setZero();
     _d_bias_gyr.setZero();
 }

@@ -7,12 +7,14 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _quaternion_prior.setRPY(0.0,0.0,0.0);
 
     _mean_prior.setZero();
+    _mean_sample.setZero();
     _mean_posterior.setZero();
     _mean_meas.setZero();
 
     Eigen::Matrix<double, 1, 6> sigma;
-    sigma << 0.1, 0.1, 0.1, 0.0001, 0.0001, 0.0001;
+    sigma << 0.04, 0.04, 0.04, 0.002, 0.002, 0.002;
     _cov_prior = sigma.asDiagonal();
+    _cov_sample.setZero();
     _cov_posterior.setZero();
     _cov_meas.setZero();
 
@@ -45,9 +47,7 @@ void GPF::odom_callback(const nav_msgs::Odometry &msg) {
     double r, p, y;
     _rotation_prior.getRPY(r, p, y);
 
-    _theta_prior.setX(r);
-    _theta_prior.setX(p);
-    _theta_prior.setX(y);
+    _theta_prior.setValue(r, p, y);
 
     _mean_prior[0] = _position_prior.x();
     _mean_prior[1] = _position_prior.y();
@@ -60,6 +60,8 @@ void GPF::odom_callback(const nav_msgs::Odometry &msg) {
     for(int i=0; i<6; i++) {
         for(int j=0; j<6; j++) {
             _cov_prior(i,j) = msg.pose.covariance[i*6+j];
+            if(i==j && i < 3) _cov_prior(i,j) = 0.04;
+            if(i==j && i > 2) _cov_prior(i,j) = 0.01;
         }
     }
 }
@@ -77,7 +79,15 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     _particles_ptr->set_mean(_mean_prior);
     _particles_ptr->set_cov(_cov_prior);
     _particles_ptr->set_cloud(_cloud_ptr);
-    _particles_ptr->propagate(_mean_posterior, _cov_posterior);
+    _particles_ptr->propagate(_mean_sample, _cov_sample,
+                              _mean_posterior, _cov_posterior);
+
+    /* TESTING PARTICLE FILTER RESUTLS*/
+    std::cout<< "mean sample:\n" << _mean_sample.transpose()<<std::endl;
+    std::cout<< "mean poster:\n" << _mean_posterior.transpose()<<std::endl;
+    std::cout<< "cov sample:\n" << _cov_sample<<std::endl;
+    std::cout<< "cov poster:\n" << _cov_posterior<<std::endl;
+
     publish_pset(*_particles_ptr);
 
     nav_msgs::Odometry pmsg;
@@ -100,8 +110,8 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     }
     _post_pub.publish(pmsg);
 
-    recover_meas();
-    publish_meas();
+//    recover_meas();
+//    publish_meas();
 }
 
 void GPF::downsample() {
@@ -162,16 +172,16 @@ void GPF::downsample() {
 }
 
 void GPF::recover_meas() {
-    Eigen::Matrix<double, 6, 6> C;
     Eigen::Matrix<double, 6, 6> K;
-    Eigen::Matrix<double, 6, 6> H = Eigen::MatrixXd::Identity(6, 6);
 
-    C = (_cov_posterior.inverse() - _cov_prior.inverse()).inverse();
-    check_posdef(C);
+    _cov_meas = (_cov_posterior.inverse() - _cov_sample.inverse()).inverse();
+    check_posdef(_cov_meas);
+    K = _cov_sample * ( _cov_sample + _cov_meas).inverse();
+    _mean_meas = K.inverse() * (_mean_posterior - _mean_sample) + _mean_sample;
 
-    K = _cov_prior.inverse() * H.transpose() * (H * _cov_prior * H.transpose() + C).inverse();
-    _mean_meas = K.inverse() * (_mean_posterior - _mean_prior) + _mean_prior;
-    _cov_meas = C;
+    std::cout << "Kalman gain:\n" << K << std::endl;
+    std::cout << "mean meas:\n" << _mean_meas.transpose() << std::endl;
+    std::cout << "cov meas:\n" << _cov_meas << std::endl;
 }
 
 void GPF::check_posdef(Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &R) {
@@ -190,7 +200,7 @@ void GPF::check_posdef(Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &R) {
             E(ii,ii) = scl(ii,0);
         }
         else {
-            E(ii,ii) = 10.0;
+            E(ii,ii) = 100.0;
         }
     }
     R = rot * E * rot.inverse();

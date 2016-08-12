@@ -203,7 +203,7 @@ Visualization Manager:
       Value: true
     - Angle Tolerance: 0.01
       Class: rviz/Odometry
-      Color: 0; 255; 255
+      Color: 255; 0; 255
       Enabled: true
       Keep: 1
       Length: 0.5
@@ -214,13 +214,13 @@ Visualization Manager:
     - Angle Tolerance: 0.01
       Class: rviz/Odometry
       Color: 255; 25; 0
-      Enabled: true
+      Enabled: false
       Keep: 1
       Length: 0.5
       Name: Odometry
       Position Tolerance: 0.01
       Topic: /dji_sim/odometry
-      Value: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -245,7 +245,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/XYOrbit
-      Distance: 2.36778
+      Distance: 1.70534
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
@@ -257,10 +257,10 @@ Visualization Manager:
         Z: -3.59332e-06
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.034796
+      Pitch: -0.270204
       Target Frame: world
       Value: XYOrbit (rviz)
-      Yaw: 6.02548
+      Yaw: 4.73046
     Saved:
       - Class: rviz/XYOrbit
         Distance: 22.1068
@@ -295,5 +295,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1280
-  X: 610
-  Y: 26
+  X: 470
+  Y: 45

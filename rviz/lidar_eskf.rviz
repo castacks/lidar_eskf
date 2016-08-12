@@ -148,7 +148,7 @@ Visualization Manager:
       Marker Topic: /lidar_eskf/marker
       Name: particles
       Namespaces:
-        {}
+        particle_set: true
       Queue Size: 10
       Value: true
     - Alpha: 1
@@ -203,7 +203,7 @@ Visualization Manager:
       Value: true
     - Angle Tolerance: 0.01
       Class: rviz/Odometry
-      Color: 0; 255; 255
+      Color: 255; 0; 255
       Enabled: true
       Keep: 1
       Length: 0.5
@@ -219,7 +219,7 @@ Visualization Manager:
       Length: 0.5
       Name: Odometry
       Position Tolerance: 0.01
-      Topic: /dji_sim/odometry
+      Topic: /lidar_eskf/odom
       Value: true
   Enabled: true
   Global Options:
@@ -245,22 +245,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/XYOrbit
-      Distance: 4.91973
+      Distance: 1.90968
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.00294361
-        Y: -0.0031081
-        Z: -3.59332e-06
+        X: -0.00220406
+        Y: 0.00590044
+        Z: -3.89134e-06
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.249796
+      Pitch: 1.4648
       Target Frame: world
       Value: XYOrbit (rviz)
-      Yaw: 1.79729
+      Yaw: 3.66731
     Saved:
       - Class: rviz/XYOrbit
         Distance: 22.1068
@@ -295,5 +295,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1553
-  X: 763
-  Y: 47
+  X: 347
+  Y: 14
