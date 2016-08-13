@@ -17,8 +17,6 @@ Particles::Particles(boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map_ptr)
     _d_cov_sample.setZero();
     _d_cov_posterior.setZero();
 
-    _pset.resize(SET_SIZE);
-    _d_pset.resize(SET_SIZE);
 }
 
 void Particles::set_cloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr) {
@@ -37,16 +35,22 @@ void Particles::set_raysigma(double raysigma) {
     _ray_sigma = raysigma;
 }
 
+void Particles::set_size(int set_size) {
+    _set_size = set_size;
+
+    _pset.resize(_set_size);
+    _d_pset.resize(_set_size);
+}
 void Particles::draw_set() {
 
     mvn.setMean(_d_mean_prior);
     mvn.setCovar(_d_cov_prior);
 
-    for(int i=0; i<SET_SIZE; i++) {
+    for(int i=0; i<_set_size; i++) {
         // random sample error states
         mvn.nextSample(_d_pset[i].state);
 
-        _d_pset[i].weight = log(1.0/SET_SIZE);
+        _d_pset[i].weight = log(1.0/_set_size);
         _pset[i].weight = _d_pset[i].weight;
 
         // recover nominal states
@@ -63,17 +67,17 @@ void Particles::draw_set() {
     _d_mean_sample.setZero();
     _d_cov_sample.setZero();
 
-    for(int i=0; i<SET_SIZE; i++) {
-        _d_mean_sample += _d_pset[i].state / SET_SIZE;
+    for(int i=0; i<_set_size; i++) {
+        _d_mean_sample += _d_pset[i].state / _set_size;
     }
-    for(int i=0; i<SET_SIZE; i++) {
-        _d_cov_sample += (_d_pset[i].state - _d_mean_sample)*(_d_pset[i].state - _d_mean_sample).transpose() / SET_SIZE;
+    for(int i=0; i<_set_size; i++) {
+        _d_cov_sample += (_d_pset[i].state - _d_mean_sample)*(_d_pset[i].state - _d_mean_sample).transpose() / _set_size;
     }
 }
 
 void Particles::weight_set() {
 #pragma omp parallel for
-    for(int i=0; i<SET_SIZE; i++) {
+    for(int i=0; i<_set_size; i++) {
         // reproject cloud on to each particle
         pcl::PointCloud<pcl::PointXYZ> cloud_transformed;
         reproject_cloud(_pset[i], cloud_transformed);
@@ -82,23 +86,23 @@ void Particles::weight_set() {
         weight_particle(_pset[i], cloud_transformed);
     }
 
-    // stabilize weights, offset weight values to [-50.0, 0.0] range
+    // stabilize weights, offset weight values to [-200.0, 0.0] range
     double max_weight(-INFINITY);
-    for(int i=0; i<SET_SIZE; i++) {
+    for(int i=0; i<_set_size; i++) {
         if(_pset[i].weight > max_weight) max_weight = _pset[i].weight;
     }
-    for(int i=0; i<SET_SIZE; i++) {
+    for(int i=0; i<_set_size; i++) {
         _pset[i].weight -= max_weight;
-        if(_pset[i].weight < -50.0) _pset[i].weight = -50.0;
+        if(_pset[i].weight < -200.0) _pset[i].weight = -200.0;
     }
 
     // normalize weight
     double weight_sum = 0.0;
-    for(int i=0; i<SET_SIZE; i++) {
+    for(int i=0; i<_set_size; i++) {
         weight_sum += exp(_pset[i].weight);
     }
     double log_weight_sum = log(weight_sum);
-    for(int i=0; i<SET_SIZE; i++) {
+    for(int i=0; i<_set_size; i++) {
         _pset[i].weight -= log_weight_sum;
         _d_pset[i].weight = _pset[i].weight;
     }
@@ -158,10 +162,10 @@ void Particles::get_posterior() {
     _d_mean_posterior.setZero();
     _d_cov_posterior.setZero();
 
-    for(int i=0; i<SET_SIZE; i++) {
+    for(int i=0; i<_set_size; i++) {
         _d_mean_posterior += exp(_d_pset[i].weight) * _d_pset[i].state;
     }
-    for(int i=0; i<SET_SIZE; i++) {
+    for(int i=0; i<_set_size; i++) {
         _d_cov_posterior += exp(_d_pset[i].weight) * (_d_pset[i].state - _d_mean_posterior) * (_d_pset[i].state - _d_mean_posterior).transpose();
     }
 }

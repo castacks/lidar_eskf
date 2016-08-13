@@ -11,24 +11,29 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _mean_posterior.setZero();
     _mean_meas.setZero();
 
-    Eigen::Matrix<double, 1, 6> sigma;
-    sigma << 0.04, 0.04, 0.04, 0.002, 0.002, 0.002;
+    Eigen::Matrix<double, 6, 1> sigma;
+    sigma << 0.01, 0.01, 0.01, 0.005, 0.005, 0.005;
     _cov_prior = sigma.asDiagonal();
     _cov_sample.setZero();
     _cov_posterior.setZero();
     _cov_meas.setZero();
 
-    _cloud_sub = nh.subscribe("cloud", 100, &GPF::cloud_callback, this);
+    _cloud_sub = nh.subscribe("cloud", 2, &GPF::cloud_callback, this);
     _odom_sub = nh.subscribe("odom", 100, &GPF::odom_callback, this);
+    _cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("dsmp_cloud",10);
     _meas_pub = nh.advertise<nav_msgs::Odometry>("meas", 100);
     _pset_pub = nh.advertise<visualization_msgs::MarkerArray>("marker", 10);
     _post_pub = nh.advertise<nav_msgs::Odometry>("posterior", 100);
 
     // initialize particles pointer
-    nh.param("ray_sigma", _ray_sigma, 1.0);
+    nh.param("cloud_sigma", _ray_sigma, 1.0);
     nh.param("cloud_resolution", _cloud_resol, 0.2);
+    nh.param("set_size", _set_size, 500);
+    nh.param("cloud_range", _cloud_range, 20.0);
+
     _particles_ptr = boost::shared_ptr<Particles> (new Particles(map_ptr));
     _particles_ptr->set_raysigma(_ray_sigma);
+    _particles_ptr->set_size(_set_size);
 }
 
 void GPF::odom_callback(const nav_msgs::Odometry &msg) {
@@ -60,8 +65,8 @@ void GPF::odom_callback(const nav_msgs::Odometry &msg) {
     for(int i=0; i<6; i++) {
         for(int j=0; j<6; j++) {
             _cov_prior(i,j) = msg.pose.covariance[i*6+j];
-            if(i==j && i < 3) _cov_prior(i,j) = 0.04;
-            if(i==j && i > 2) _cov_prior(i,j) = 0.01;
+//            if(i==j && i < 3) _cov_prior(i,j) = 0.09;
+//            if(i==j && i > 2) _cov_prior(i,j) = 0.01;
         }
     }
 }
@@ -81,6 +86,7 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     _particles_ptr->set_cloud(_cloud_ptr);
     _particles_ptr->propagate(_mean_sample, _cov_sample,
                               _mean_posterior, _cov_posterior);
+    _mean_posterior += _mean_sample;
 
     /* TESTING PARTICLE FILTER RESUTLS*/
     std::cout<< "mean sample:\n" << _mean_sample.transpose()<<std::endl;
@@ -88,30 +94,10 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     std::cout<< "cov sample:\n" << _cov_sample<<std::endl;
     std::cout<< "cov poster:\n" << _cov_posterior<<std::endl;
 
-    publish_pset(*_particles_ptr);
+    publish_pset();
+    publish_cloud();
+    publish_posterior();
 
-    nav_msgs::Odometry pmsg;
-    pmsg.header.frame_id = "world";
-    pmsg.header.stamp = _laser_time;
-    pmsg.pose.pose.position.x = _mean_posterior[0];
-    pmsg.pose.pose.position.y = _mean_posterior[1];
-    pmsg.pose.pose.position.z = _mean_posterior[2];
-    tf::Quaternion q;
-    q.setRPY(_mean_posterior[3], _mean_posterior[4], _mean_posterior[5]);
-    pmsg.pose.pose.orientation.x = q.x();
-    pmsg.pose.pose.orientation.y = q.y();
-    pmsg.pose.pose.orientation.z = q.z();
-    pmsg.pose.pose.orientation.w = q.w();
-
-    for(int i=0; i<STATE_SIZE; i++) {
-        for(int j=0; j<STATE_SIZE; j++) {
-            pmsg.pose.covariance[6*i+j] = _cov_posterior(i,j);
-        }
-    }
-    _post_pub.publish(pmsg);
-
-//    recover_meas();
-//    publish_meas();
 }
 
 void GPF::downsample() {
@@ -129,21 +115,20 @@ void GPF::downsample() {
     pcl::copyPointCloud (*_cloud_ptr, sampled_indices.points, *unif_cloud);
 
     // truncating in range
-    double rangeLim = 15.0;
     pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud(unif_cloud);
     pass.setFilterFieldName("x");
-    pass.setFilterLimits (-rangeLim, rangeLim);
+    pass.setFilterLimits (-_cloud_range, _cloud_range);
     pass.filter(*xlim_cloud);
 
     pass.setInputCloud(xlim_cloud);
     pass.setFilterFieldName("y");
-    pass.setFilterLimits (-rangeLim, rangeLim);
+    pass.setFilterLimits (-_cloud_range, _cloud_range);
     pass.filter(*ylim_cloud);
 
     pass.setInputCloud(ylim_cloud);
     pass.setFilterFieldName("z");
-    pass.setFilterLimits (-rangeLim, rangeLim);
+    pass.setFilterLimits (-_cloud_range, _cloud_range);
     pass.filter(*zlim_cloud);
 
     _cloud_ptr.reset();
@@ -232,15 +217,15 @@ void GPF::publish_meas() {
     _meas_pub.publish(msg);
 }
 
-void GPF::publish_pset(Particles p) {
+void GPF::publish_pset() {
 
     std::vector<std::vector<double> > c;
-    c = compute_color(p);
-    std::vector<Particle> pset = p.get_pset();
+    c = compute_color(*_particles_ptr);
+    std::vector<Particle> pset = _particles_ptr->get_pset();
 
     visualization_msgs::MarkerArray msg;
 
-    for(int i=0; i<SET_SIZE; i++) {
+    for(int i=0; i<_set_size; i++) {
 
         tf::Vector3 position;
         tf::Quaternion quaternion;
@@ -281,10 +266,10 @@ std::vector< std::vector<double> > GPF::compute_color(Particles pSet) {
     std::vector< std::vector<double> > color;
 
     // find maximum and minimum weight
-    double minWeight = 99.9;
-    double maxWeight = -99.9;
+    double minWeight = 999.9;
+    double maxWeight = -999.9;
 
-    for(int i=0; i<SET_SIZE; i++) {
+    for(int i=0; i<_set_size; i++) {
         Particle p = particle[i];
         if(p.weight > maxWeight) maxWeight = p.weight;
         if(p.weight < minWeight) minWeight = p.weight;
@@ -315,4 +300,52 @@ std::vector< std::vector<double> > GPF::compute_color(Particles pSet) {
         color.push_back(cRGB);
     }
     return color;
+}
+
+void GPF::publish_cloud() {
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+    Eigen::Matrix4d transform;
+    Eigen::Matrix3d rotation;
+    Eigen::Vector3d translation;
+
+    translation << _mean_prior[0], _mean_prior[1], _mean_prior[2];
+
+    rotation = Eigen::AngleAxisd(_mean_prior[3], Eigen::Vector3d(1.0,0.0,0.0))
+             * Eigen::AngleAxisd(_mean_prior[4], Eigen::Vector3d(0.0,1.0,0.0))
+             * Eigen::AngleAxisd(_mean_prior[5], Eigen::Vector3d(0.0,0.0,1.0));
+
+    transform << rotation, translation,
+                 0, 0, 0, 1;
+
+    pcl::transformPointCloud(*_cloud_ptr, cloud, transform);
+
+    sensor_msgs::PointCloud2 msg;
+    pcl::toROSMsg(cloud, msg);
+
+    msg.header.frame_id = "world";
+    msg.header.stamp = _laser_time;
+
+    _cloud_pub.publish(msg);
+}
+
+void GPF::publish_posterior() {
+    nav_msgs::Odometry msg;
+    msg.header.frame_id = "world";
+    msg.header.stamp = _laser_time;
+    msg.pose.pose.position.x = _mean_posterior[0];
+    msg.pose.pose.position.y = _mean_posterior[1];
+    msg.pose.pose.position.z = _mean_posterior[2];
+    tf::Quaternion q;
+    q.setRPY(_mean_posterior[3], _mean_posterior[4], _mean_posterior[5]);
+    msg.pose.pose.orientation.x = q.x();
+    msg.pose.pose.orientation.y = q.y();
+    msg.pose.pose.orientation.z = q.z();
+    msg.pose.pose.orientation.w = q.w();
+
+    for(int i=0; i<STATE_SIZE; i++) {
+        for(int j=0; j<STATE_SIZE; j++) {
+            msg.pose.covariance[6*i+j] = _cov_posterior(i,j);
+        }
+    }
+    _post_pub.publish(msg);
 }

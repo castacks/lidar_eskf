@@ -156,7 +156,7 @@ void ESKF::propagate_state() {
     // system transition function for nominal state
     velocity = _velocity + (_rotation * (_imu_acceleration - _bias_acc) + _gravity ) * _dt;
     rotation = _rotation * vec_to_rot((_imu_angular_velocity - _bias_gyr) * _dt);
-    position = _position + _velocity * _dt + 0.5 * (_rotation * (_imu_acceleration - _bias_acc) + _gravity) * _dt * _dt;
+    position = _position + _velocity * _dt; // + 0.5 * (_rotation * (_imu_acceleration - _bias_acc) + _gravity) * _dt * _dt;
     bias_acc = _bias_acc;
     bias_gyr = _bias_gyr;
 
@@ -325,7 +325,7 @@ void ESKF::update_error() {
     // update covariance
     Eigen::Matrix<double, 15, 15> M;
     M = Eigen::MatrixXd::Identity(15,15) - K*H;
-    _Sigma = M * _Sigma * M.transpose() + K * _m_pose_sigma * K.transpose();
+    _Sigma = M * _Sigma;// * M.transpose() + K * _m_pose_sigma * K.transpose();
 
 }
 

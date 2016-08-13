@@ -11,19 +11,21 @@
         
         <param name="map_file_name"            value="$(find lidar_eskf)/map/gazebo_bridge.bt"/>
         <param name="octree_resolution"        value="0.2"/>
-        <param name="max_obstacle_dist"        value="3.0"/>
-        <param name="ray_sigma"                value="1.0"/>
-        <param name="cloud_resolution"         value="0.4"/>
+        <param name="max_obstacle_dist"        value="5.0"/>
+        <param name="ray_sigma"                value="2.0"/>
+        <param name="cloud_resolution"         value="0.2"/>
+        <param name="cloud_range"              value="25.0"/>
+        <param name="set_size"                 value="500"/>
 
 	
 	    <remap from="/imu"                      to="/dji_sim/imu"/>
 	    <remap from="/meas"                     to="/lidar_eskf/posterior"/>
 	    
         <param name="imu_frequency"             value="100"/>
-        <param name="sigma_acceleration"        value="0.1"/>
+        <param name="sigma_acceleration"        value="1.0"/>
         <param name="sigma_gyroscop"            value="0.01"/>
-        <param name="sigma_acceleration_bias"   value="0.0002"/>
-        <param name="sigma_gyroscope_bias"      value="0.0001"/>
+        <param name="sigma_acceleration_bias"   value="0.00001"/>
+        <param name="sigma_gyroscope_bias"      value="0.00001"/>
         <param name="gravity"                   value="9.82"/>
         
         <param name="init_bias_acc_x"           value="0.0"/>

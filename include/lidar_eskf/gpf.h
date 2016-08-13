@@ -23,8 +23,10 @@ public:
     void downsample();
     void recover_meas();
     void check_posdef(Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &R);
+    void publish_cloud();
+    void publish_posterior();
     void publish_meas();
-    void publish_pset(Particles p);
+    void publish_pset();
     std::vector< std::vector<double> > compute_color(Particles pSet);
 
 private:
@@ -45,8 +47,10 @@ private:
 
     ros::Subscriber _cloud_sub;
     ros::Subscriber _odom_sub;
+    ros::Publisher  _cloud_pub;
     ros::Publisher  _meas_pub;
     ros::Publisher  _pset_pub;
+    ros::Publisher _post_pub;
 
     ros::Time _laser_time;
 
@@ -58,9 +62,8 @@ private:
 
     double _cloud_resol;
     double _ray_sigma;
-
-    /* test */
-    ros::Publisher _post_pub;
+    int    _set_size;
+    double _cloud_range;
 
 };
 #endif // GPF_H

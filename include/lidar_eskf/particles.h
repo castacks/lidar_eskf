@@ -10,7 +10,7 @@
 #include "lidar_eskf/EigenMultivariateNormal.hpp"
 #include "lidar_eskf/map.h"
 
-#define SET_SIZE 500
+#define SET_SIZE 5000
 #define STATE_SIZE 6
 
 struct Particle {
@@ -31,6 +31,7 @@ public:
     void set_mean(Eigen::Matrix<double, STATE_SIZE, 1> &mean);
     void set_cov(Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov);
     void set_cloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr);
+    void set_size(int set_size);
     void draw_set();
     void weight_set();
 
@@ -65,6 +66,7 @@ private:
     boost::shared_ptr<DistMap> _map_ptr;
 
     double _ray_sigma;
+    int _set_size;
 
 };
 #endif // PARTICLES_H
