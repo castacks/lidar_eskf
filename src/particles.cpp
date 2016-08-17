@@ -86,6 +86,12 @@ void Particles::weight_set() {
         weight_particle(_pset[i], cloud_transformed);
     }
 
+//    std::cout << "Particles: weight_1 = ";
+//    for(int i=0; i<_set_size; i++) {
+//        std::cout << exp(_pset[i].weight) << "\t";
+//    }
+//    std::cout << std::endl;
+
     // stabilize weights, offset weight values to [-200.0, 0.0] range
     double max_weight(-INFINITY);
     for(int i=0; i<_set_size; i++) {
@@ -95,6 +101,12 @@ void Particles::weight_set() {
         _pset[i].weight -= max_weight;
         if(_pset[i].weight < -200.0) _pset[i].weight = -200.0;
     }
+
+//    std::cout << "Particles: weight_2 = ";
+//    for(int i=0; i<_set_size; i++) {
+//        std::cout << exp(_pset[i].weight) << "\t";
+//    }
+//    std::cout << std::endl;
 
     // normalize weight
     double weight_sum = 0.0;
@@ -107,6 +119,11 @@ void Particles::weight_set() {
         _d_pset[i].weight = _pset[i].weight;
     }
 
+//    std::cout << "Particles: weight_3 = ";
+//    for(int i=0; i<_set_size; i++) {
+//        std::cout << exp(_pset[i].weight) << "\t";
+//    }
+//    std::cout << std::endl;
 }
 
 void Particles::reproject_cloud(Particle &p, pcl::PointCloud<pcl::PointXYZ> &cloud) {
@@ -137,10 +154,8 @@ void Particles::weight_particle(Particle &p, pcl::PointCloud<pcl::PointXYZ> &clo
         // look up the distance to nearest obstacle
         double dist = _map_ptr->get_dist(end_pnt);
 
-        // lookup grid type
-        char grid_flag = _map_ptr->get_gridmask(end_pnt);
-
         // find weight through normal distribution
+        char grid_flag = _map_ptr->get_gridmask(end_pnt);
         if(grid_flag != 2) {
             if(dist >= 0.0 && dist <= 2.0*_ray_sigma) {
                 p.weight += log_likelihood(dist, _ray_sigma);

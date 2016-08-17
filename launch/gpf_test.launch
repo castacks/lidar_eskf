@@ -12,7 +12,7 @@
         <param name="map_file_name"            value="$(find lidar_eskf)/map/gazebo_bridge.bt"/>
         <param name="octree_resolution"        value="0.2"/>
         <param name="max_obstacle_dist"        value="5.0"/>
-        <param name="ray_sigma"                value="1.0"/>
+        <param name="ray_sigma"                value="2.0"/>
         <param name="cloud_resolution"         value="0.2"/>
         <param name="set_size"                 value="1000"/>
         

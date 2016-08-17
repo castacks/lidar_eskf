@@ -144,6 +144,14 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
     _imu_orientation.setZ(msg.orientation.z);
     _imu_orientation.setW(msg.orientation.w);
 
+    tf::Matrix3x3 imu_rotation;
+    tf::Vector3 grav(0.0, 0.0, -9.82);
+    imu_rotation.setRotation(_imu_orientation);
+
+    _imu_acceleration -= imu_rotation.transpose() * grav;
+    _imu_acceleration.setZero();
+    ROS_INFO("ESKF: acceleration: \t %0.4f \t %0.4f \t %0.4f \t", _imu_acceleration[0], _imu_acceleration[1], _imu_acceleration[2]);
+
 }
 
 void ESKF::propagate_state() {
@@ -156,7 +164,7 @@ void ESKF::propagate_state() {
     // system transition function for nominal state
     velocity = _velocity + (_rotation * (_imu_acceleration - _bias_acc) + _gravity ) * _dt;
     rotation = _rotation * vec_to_rot((_imu_angular_velocity - _bias_gyr) * _dt);
-    position = _position + _velocity * _dt; // + 0.5 * (_rotation * (_imu_acceleration - _bias_acc) + _gravity) * _dt * _dt;
+    position = _position + _velocity * _dt + 0.5 * (_rotation * (_imu_acceleration - _bias_acc) + _gravity) * _dt * _dt;
     bias_acc = _bias_acc;
     bias_gyr = _bias_gyr;
 

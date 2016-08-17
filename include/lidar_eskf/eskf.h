@@ -96,6 +96,7 @@ private:
     std::vector<geometry_msgs::Vector3> _acc_queue;
     int _acc_queue_size;
     int _acc_queue_count;
+
 };
 
 #endif // IMUODOM_H

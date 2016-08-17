@@ -65,5 +65,11 @@ private:
     int    _set_size;
     double _cloud_range;
 
+    double _imu_to_laser_roll;
+    double _imu_to_laser_pitch;
+    double _imu_to_laser_yaw;
+    tf::Matrix3x3 _imu_to_laser_rotation;
+    Eigen::Matrix<double, 4, 4> _imu_to_laser_transform;
+
 };
 #endif // GPF_H

@@ -2,31 +2,35 @@
 <launch>
 
 	<param name="use_sim_time" value="true" />
+    
+    <node pkg="rosbag" type="play" name="playbag" output="screen"
+          args="--pause --clock --rate 0.2
+                $(find lidar_eskf)/dat/NSH1109_circle/lidar.bag
+                $(find lidar_eskf)/dat/NSH1109_circle/imu.bag
+                $(find lidar_eskf)/dat/NSH1109_circle/camera.bag"/>
                 
 	<node pkg="tf" type="static_transform_publisher" name="world_view" args="0 0 0 0 0 3.1415926 world world_view 100"/> 
 	
 	<node pkg="lidar_eskf" type="lidar_eskf_node" name="lidar_eskf" output="screen">
 	
-	    <remap from="/lidar_eskf/cloud"            to="/dji_sim/laser/pointcloud"/>
-        
-        <param name="map_file_name"            value="$(find lidar_eskf)/map/gazebo_bridge.bt"/>
-        <param name="octree_resolution"        value="0.2"/>
-        <param name="max_obstacle_dist"        value="5.0"/>
-        <param name="ray_sigma"                value="2.0"/>
-        <param name="cloud_resolution"         value="0.2"/>
-        <param name="cloud_range"              value="25.0"/>
-        <param name="set_size"                 value="500"/>
-
-	
-	    <remap from="/imu"                      to="/dji_sim/imu"/>
+	    <remap from="/lidar_eskf/cloud"        to="/3d_lidar_cloud"/>
+        <remap from="/imu"                      to="/imu_driver/imu"/>
 	    <remap from="/meas"                     to="/lidar_eskf/posterior"/>
 	    
+        <param name="map_file_name"            value="$(find lidar_eskf)/map/nsh_1109.bt"/>
+        <param name="octree_resolution"        value="0.05"/>
+        <param name="max_obstacle_dist"        value="1.0"/>
+        <param name="ray_sigma"                value="0.5"/>
+        <param name="cloud_resolution"         value="0.1"/>
+        <param name="cloud_range"              value="15.0"/>
+        <param name="set_size"                 value="500"/>
+
         <param name="imu_frequency"             value="100"/>
-        <param name="sigma_acceleration"        value="1.0"/>
-        <param name="sigma_gyroscop"            value="0.01"/>
-        <param name="sigma_acceleration_bias"   value="0.00001"/>
-        <param name="sigma_gyroscope_bias"      value="0.00001"/>
-        <param name="gravity"                   value="9.82"/>
+        <param name="sigma_acceleration"        value="0.4"/>
+        <param name="sigma_gyroscop"            value="0.02"/>
+        <param name="sigma_acceleration_bias"   value="0.001"/>
+        <param name="sigma_gyroscope_bias"      value="0.001"/>
+        <param name="gravity"                   value="0.0"/>
         
         <param name="init_bias_acc_x"           value="0.0"/>
         <param name="init_bias_acc_y"           value="0.0"/>
@@ -34,11 +38,14 @@
         
         <param name="acc_queue_size"            value="10"/>
         
+        <param name="imu_to_laser_roll"            value="-1.5707963"/>
+        <param name="imu_to_laser_pitch"           value="0.0"/>
+        <param name="imu_to_laser_yaw"             value="1.5707963"/>
 
 	</node>
 	
 	<node pkg="octomap_server" type="octomap_server_node" name="octomap_server" 
-	      args="$(find lidar_eskf)/map/gazebo_bridge.bt">
+	      args="$(find lidar_eskf)/map/nsh_1109.bt">
 	      <param name="frame_id"           value="world"/>
 	      <param name="base_frame_id"      value="world_view"/>
 	</node>

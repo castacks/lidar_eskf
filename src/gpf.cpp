@@ -30,6 +30,16 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     nh.param("cloud_resolution", _cloud_resol, 0.2);
     nh.param("set_size", _set_size, 500);
     nh.param("cloud_range", _cloud_range, 20.0);
+    nh.param("imu_to_laser_roll",       _imu_to_laser_roll,     0.0);
+    nh.param("imu_to_laser_pitch",      _imu_to_laser_pitch,    0.0);
+    nh.param("imu_to_laser_yaw",        _imu_to_laser_yaw,      0.0);
+
+    _imu_to_laser_rotation.setRPY(_imu_to_laser_roll, _imu_to_laser_pitch, _imu_to_laser_yaw);
+
+    _imu_to_laser_transform << _imu_to_laser_rotation[0][0], _imu_to_laser_rotation[0][1], _imu_to_laser_rotation[0][2], 0,
+                               _imu_to_laser_rotation[1][0], _imu_to_laser_rotation[1][1], _imu_to_laser_rotation[1][2], 0,
+                               _imu_to_laser_rotation[2][0], _imu_to_laser_rotation[2][1], _imu_to_laser_rotation[2][2], 0,
+                                                          0,                            0,                            0, 1;
 
     _particles_ptr = boost::shared_ptr<Particles> (new Particles(map_ptr));
     _particles_ptr->set_raysigma(_ray_sigma);
@@ -65,8 +75,6 @@ void GPF::odom_callback(const nav_msgs::Odometry &msg) {
     for(int i=0; i<6; i++) {
         for(int j=0; j<6; j++) {
             _cov_prior(i,j) = msg.pose.covariance[i*6+j];
-//            if(i==j && i < 3) _cov_prior(i,j) = 0.09;
-//            if(i==j && i > 2) _cov_prior(i,j) = 0.01;
         }
     }
 }
@@ -79,24 +87,33 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     _cloud_ptr = cloud_ptr;
 
     downsample();
-    ROS_INFO("GPF: cloud size = %d", (int)_cloud_ptr->size());
+//    ROS_INFO("GPF: cloud size = %d", (int)_cloud_ptr->size());
 
+    // transform to imu frame
+    pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::transformPointCloud(*_cloud_ptr, *transformed_cloud_ptr, _imu_to_laser_transform);
+    _cloud_ptr = transformed_cloud_ptr;
+
+    // draw particles and propagate
     _particles_ptr->set_mean(_mean_prior);
     _particles_ptr->set_cov(_cov_prior);
     _particles_ptr->set_cloud(_cloud_ptr);
     _particles_ptr->propagate(_mean_sample, _cov_sample,
                               _mean_posterior, _cov_posterior);
-    _mean_posterior += _mean_sample;
+
+    // recover a pseudo measurements
+    recover_meas();
 
     /* TESTING PARTICLE FILTER RESUTLS*/
-    std::cout<< "mean sample:\n" << _mean_sample.transpose()<<std::endl;
-    std::cout<< "mean poster:\n" << _mean_posterior.transpose()<<std::endl;
-    std::cout<< "cov sample:\n" << _cov_sample<<std::endl;
-    std::cout<< "cov poster:\n" << _cov_posterior<<std::endl;
+//    std::cout<< "mean poster:\n" << _mean_posterior.transpose()<<std::endl;
+    std::cout<< "cov prior:\n" << _cov_prior.diagonal().transpose()<<std::endl;
+    std::cout<< "cov poster:\n" << _cov_posterior.diagonal().transpose()<<std::endl;
 
+    // publish needed resutls
     publish_pset();
     publish_cloud();
     publish_posterior();
+    publish_meas();
 
 }
 
@@ -164,9 +181,6 @@ void GPF::recover_meas() {
     K = _cov_sample * ( _cov_sample + _cov_meas).inverse();
     _mean_meas = K.inverse() * (_mean_posterior - _mean_sample) + _mean_sample;
 
-    std::cout << "Kalman gain:\n" << K << std::endl;
-    std::cout << "mean meas:\n" << _mean_meas.transpose() << std::endl;
-    std::cout << "cov meas:\n" << _cov_meas << std::endl;
 }
 
 void GPF::check_posdef(Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &R) {
