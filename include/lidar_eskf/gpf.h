@@ -10,6 +10,7 @@
 #include <pcl/filters/conditional_removal.h>
 #include <visualization_msgs/MarkerArray.h>
 
+#include "lidar_eskf/eskf.h"
 #include "lidar_eskf/particles.h"
 
 class GPF {
@@ -58,6 +59,7 @@ private:
     pcl::PointCloud<pcl::PointXYZ>::Ptr _cloud_ptr;
     ros::NodeHandlePtr _nh_ptr;
 
+    boost::shared_ptr<ESKF> _eskf_ptr;
     boost::shared_ptr<Particles> _particles_ptr;
 
     double _cloud_resol;

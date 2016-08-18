@@ -7,8 +7,7 @@ int main(int argc, char **argv) {
     ros::NodeHandle n("~");
 
     boost::shared_ptr<DistMap> map_ptr = boost::shared_ptr<DistMap>(new DistMap(n));
-    ESKF eskf(n);
-    GPF gpf(n, map_ptr);
+    boost::shared_ptr<GPF> gpf_ptr = boost::shared_ptr<GPF>(new GPF(n, map_ptr));
 
     ros::spin();
     return 0;

@@ -20,12 +20,12 @@
         <param name="map_file_name"            value="$(find lidar_eskf)/map/nsh_1109.bt"/>
         <param name="octree_resolution"        value="0.05"/>
         <param name="max_obstacle_dist"        value="1.0"/>
-        <param name="ray_sigma"                value="0.5"/>
+        <param name="ray_sigma"                value="1.0"/>
         <param name="cloud_resolution"         value="0.1"/>
         <param name="cloud_range"              value="15.0"/>
-        <param name="set_size"                 value="500"/>
+        <param name="set_size"                 value="1000"/>
 
-        <param name="imu_frequency"             value="100"/>
+        <param name="imu_frequency"             value="200"/>
         <param name="sigma_acceleration"        value="0.4"/>
         <param name="sigma_gyroscop"            value="0.02"/>
         <param name="sigma_acceleration_bias"   value="0.001"/>

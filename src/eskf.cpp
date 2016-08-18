@@ -149,7 +149,7 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
     imu_rotation.setRotation(_imu_orientation);
 
     _imu_acceleration -= imu_rotation.transpose() * grav;
-    _imu_acceleration.setZero();
+//    _imu_acceleration.setZero();
     ROS_INFO("ESKF: acceleration: \t %0.4f \t %0.4f \t %0.4f \t", _imu_acceleration[0], _imu_acceleration[1], _imu_acceleration[2]);
 
 }
@@ -215,6 +215,18 @@ void ESKF::propagate_covariance() {
     _Sigma = _Fx * _Sigma * _Fx.transpose() + _Fn * _Q * _Fn.transpose();
 }
 
+void ESKF::get_mean_pose(Eigen::Matrix<double, 6, 1> &mean_pose) {
+    mean_pose[0] = _position.x();
+    mean_pose[1] = _position.y();
+    mean_pose[2] = _position.z();
+
+    _rotation.getRPY(mean_pose[3], mean_pose[4], mean_pose[5]);
+}
+
+void ESKF::get_cov_pose(Eigen::Matrix<double, 6, 6> &cov_pose) {
+    cov_pose = _Sigma.block<6,6>(3,3);
+}
+
 void ESKF::publish_odom() {
     nav_msgs::Odometry msg;
     msg.header.frame_id = "world";
@@ -238,8 +250,6 @@ void ESKF::publish_odom() {
 
     // fill in covariance
     Eigen::Matrix<double, 6, 6> pose_sigma, twist_sigma;
-    Eigen::Matrix<double, 3, 3> R;
-    tf::matrixTFToEigen(_rotation, R);
 
     pose_sigma << _Sigma.block<6,6>(3,3);
 
@@ -301,6 +311,19 @@ void ESKF::measurement_callback(const nav_msgs::Odometry &msg) {
     _got_measurements = true;
 }
 
+void ESKF::update_mean_meas(Eigen::Matrix<double, 6, 1> &mean_meas) {
+    _m_position.setValue(mean_meas[0],mean_meas[1],mean_meas[2]);
+    _m_quaternion.setRPY(mean_meas[3],mean_meas[4],mean_meas[5]);
+    _m_rotation.setRotation(_m_quaternion);
+}
+
+void ESKF::update_cov_meas(Eigen::Matrix<double, 6, 6> &cov_meas) {
+    _m_pose_sigma = cov_meas;
+}
+
+void ESKF::update_meas_flag() {
+    _got_measurements = true;
+}
 void ESKF::update_error() {
     // assume only pose measurement is used
     Eigen::Matrix<double, 6, 15> H;
@@ -316,7 +339,7 @@ void ESKF::update_error() {
 
     // kalman gain matrix
     Eigen::Matrix<double, 15, 6> K;
-    K = _Sigma * H.transpose() * (H * _Sigma * H.transpose() + _m_pose_sigma).inverse();
+    K = _Sigma * H.transpose() * (H * _Sigma * H.transpose() + 3.0 * _m_pose_sigma).inverse();
 
     // update error
     Eigen::Matrix<double, 15, 1> x;

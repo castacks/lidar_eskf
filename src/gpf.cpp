@@ -40,7 +40,10 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
                                _imu_to_laser_rotation[1][0], _imu_to_laser_rotation[1][1], _imu_to_laser_rotation[1][2], 0,
                                _imu_to_laser_rotation[2][0], _imu_to_laser_rotation[2][1], _imu_to_laser_rotation[2][2], 0,
                                                           0,                            0,                            0, 1;
+    // initialize eskf
+    _eskf_ptr = boost::shared_ptr<ESKF> (new ESKF(nh));
 
+    // initialize particle
     _particles_ptr = boost::shared_ptr<Particles> (new Particles(map_ptr));
     _particles_ptr->set_raysigma(_ray_sigma);
     _particles_ptr->set_size(_set_size);
@@ -94,6 +97,10 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     pcl::transformPointCloud(*_cloud_ptr, *transformed_cloud_ptr, _imu_to_laser_transform);
     _cloud_ptr = transformed_cloud_ptr;
 
+//    // request prior from eskf
+//    _eskf_ptr->get_mean_pose(_mean_prior);
+//    _eskf_ptr->get_cov_pose(_cov_prior);
+
     // draw particles and propagate
     _particles_ptr->set_mean(_mean_prior);
     _particles_ptr->set_cov(_cov_prior);
@@ -101,8 +108,11 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     _particles_ptr->propagate(_mean_sample, _cov_sample,
                               _mean_posterior, _cov_posterior);
 
-    // recover a pseudo measurements
-    recover_meas();
+//    // update meas in eskf
+//    _eskf_ptr->update_mean_meas(_mean_posterior);
+//    _eskf_ptr->update_cov_meas(_cov_posterior);
+//    _eskf_ptr->update_meas_flag();
+
 
     /* TESTING PARTICLE FILTER RESUTLS*/
 //    std::cout<< "mean poster:\n" << _mean_posterior.transpose()<<std::endl;
@@ -113,7 +123,7 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     publish_pset();
     publish_cloud();
     publish_posterior();
-    publish_meas();
+//    publish_meas();
 
 }
 

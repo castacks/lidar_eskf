@@ -21,10 +21,15 @@ public:
     void propagate_error();
     void propagate_covariance();
     void propagate_state();
+    void get_mean_pose(Eigen::Matrix<double, 6, 1> &mean_pose);
+    void get_cov_pose(Eigen::Matrix<double, 6, 6> &cov_pose);
     void publish_odom();
     void publish_bias();
 
     void measurement_callback(const nav_msgs::Odometry &msg);
+    void update_mean_meas(Eigen::Matrix<double, 6, 1> &mean_meas);
+    void update_cov_meas(Eigen::Matrix<double, 6, 6> &cov_meas);
+    void update_meas_flag();
     void update_error();
     void update_state();
     void reset_error();
