@@ -10,7 +10,6 @@
 #include "lidar_eskf/EigenMultivariateNormal.hpp"
 #include "lidar_eskf/map.h"
 
-#define SET_SIZE 5000
 #define STATE_SIZE 6
 
 struct Particle {

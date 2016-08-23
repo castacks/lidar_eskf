@@ -5,6 +5,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/LaserScan.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 #include <pcl/keypoints/uniform_sampling.h>
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/conditional_removal.h>
@@ -18,7 +19,6 @@ public:
     GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr);
     ~GPF() {}
 
-    void odom_callback(const nav_msgs::Odometry &msg);
     void cloud_callback(const sensor_msgs::PointCloud2 &msg);
 
     void downsample();
@@ -28,6 +28,7 @@ public:
     void publish_posterior();
     void publish_meas();
     void publish_pset();
+    void publish_path();
     std::vector< std::vector<double> > compute_color(Particles pSet);
 
 private:
@@ -41,26 +42,19 @@ private:
     Eigen::Matrix<double, 6, 1> _mean_meas;
     Eigen::Matrix<double, 6, 6> _cov_meas;
 
-    tf::Vector3 _position_prior;
-    tf::Vector3 _theta_prior;
-    tf::Matrix3x3 _rotation_prior;
-    tf::Quaternion _quaternion_prior;
-
     ros::Subscriber _cloud_sub;
-    ros::Subscriber _odom_sub;
     ros::Publisher  _cloud_pub;
     ros::Publisher  _meas_pub;
     ros::Publisher  _pset_pub;
-    ros::Publisher _post_pub;
+    ros::Publisher  _post_pub;
+    ros::Publisher  _path_pub;
 
     ros::Time _laser_time;
 
-    boost::shared_ptr<DistMap> _map_ptr;
+    boost::shared_ptr<DistMap>          _map_ptr;
     pcl::PointCloud<pcl::PointXYZ>::Ptr _cloud_ptr;
-    ros::NodeHandlePtr _nh_ptr;
-
-    boost::shared_ptr<ESKF> _eskf_ptr;
-    boost::shared_ptr<Particles> _particles_ptr;
+    boost::shared_ptr<ESKF>             _eskf_ptr;
+    boost::shared_ptr<Particles>        _particles_ptr;
 
     double _cloud_resol;
     double _ray_sigma;
@@ -72,6 +66,8 @@ private:
     double _imu_to_laser_yaw;
     tf::Matrix3x3 _imu_to_laser_rotation;
     Eigen::Matrix<double, 4, 4> _imu_to_laser_transform;
+
+    nav_msgs::Path _path;
 
 };
 #endif // GPF_H

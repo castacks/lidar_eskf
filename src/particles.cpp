@@ -41,6 +41,7 @@ void Particles::set_size(int set_size) {
     _pset.resize(_set_size);
     _d_pset.resize(_set_size);
 }
+
 void Particles::draw_set() {
 
     mvn.setMean(_d_mean_prior);
@@ -147,6 +148,10 @@ void Particles::reproject_cloud(Particle &p, pcl::PointCloud<pcl::PointXYZ> &clo
 }
 
 void Particles::weight_particle(Particle &p, pcl::PointCloud<pcl::PointXYZ> &cloud) {
+    std::vector<double> weight;
+    weight.resize(cloud.size());
+
+#pragma omp parallel for
     for(int i=0; i<cloud.size(); i++) {
         // the end point of one ray
         octomap::point3d end_pnt(cloud[i].x, cloud[i].y, cloud[i].z);
@@ -158,17 +163,21 @@ void Particles::weight_particle(Particle &p, pcl::PointCloud<pcl::PointXYZ> &clo
         char grid_flag = _map_ptr->get_gridmask(end_pnt);
         if(grid_flag != 2) {
             if(dist >= 0.0 && dist <= 2.0*_ray_sigma) {
-                p.weight += log_likelihood(dist, _ray_sigma);
+                weight[i] = log_likelihood(dist, _ray_sigma);
             } else {
-                p.weight += log_likelihood(2.0*_ray_sigma, _ray_sigma);
+                weight[i] = log_likelihood(2.0*_ray_sigma, _ray_sigma);
             }
         } else {
             if(dist >= 0.0 && dist <= 0.5*_ray_sigma) {
-                p.weight += log_likelihood(dist, _ray_sigma);
+                weight[i] = log_likelihood(dist, _ray_sigma);
             } else {
-                p.weight += log_likelihood(0.5*_ray_sigma, _ray_sigma);
+                weight[i] = log_likelihood(0.5*_ray_sigma, _ray_sigma);
             }
         }
+    }
+
+    for(int i=0; i<cloud.size(); i++) {
+        p.weight += weight[i];
     }
 }
 
@@ -194,7 +203,9 @@ void Particles::propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean_prior,
     draw_set();
 
     // weight each particles
+    double start = ros::Time::now().toSec();
     weight_set();
+    ROS_INFO("weighting time: %f",ros::Time::now().toSec() - start );
 
     // compute weighted mean and cov
     get_posterior();

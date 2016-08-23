@@ -26,9 +26,8 @@ public:
     void publish_odom();
     void publish_bias();
 
-    void measurement_callback(const nav_msgs::Odometry &msg);
-    void update_mean_meas(Eigen::Matrix<double, 6, 1> &mean_meas);
-    void update_cov_meas(Eigen::Matrix<double, 6, 6> &cov_meas);
+    void update_meas_mean(Eigen::Matrix<double, 6, 1> &mean_meas);
+    void update_meas_cov(Eigen::Matrix<double, 6, 6> &cov_meas);
     void update_meas_flag();
     void update_error();
     void update_state();
@@ -83,19 +82,14 @@ private:
 
     // subscriber and publisher
     ros::Subscriber _imu_sub;
-    ros::Subscriber _meas_sub;
     ros::Publisher  _odom_pub, _bias_pub;
 
     // odometry measurements
-    tf::Vector3    _m_velocity;
-    tf::Matrix3x3  _m_rotation;
-    tf::Quaternion _m_quaternion;
     tf::Vector3    _m_theta;
     tf::Vector3    _m_position;
     bool _got_measurements;
 
     Eigen::Matrix<double, 6, 6> _m_pose_sigma;
-    Eigen::Matrix<double, 6, 6> _m_twist_sigma;
 
     // a queue to smooth imu accleration measurements
     std::vector<geometry_msgs::Vector3> _acc_queue;

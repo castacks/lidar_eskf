@@ -1,10 +1,6 @@
 #include "lidar_eskf/gpf.h"
 
 GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map_ptr){
-    _position_prior.setZero();
-    _theta_prior.setZero();
-    _rotation_prior.setIdentity();
-    _quaternion_prior.setRPY(0.0,0.0,0.0);
 
     _mean_prior.setZero();
     _mean_sample.setZero();
@@ -18,12 +14,12 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _cov_posterior.setZero();
     _cov_meas.setZero();
 
-    _cloud_sub = nh.subscribe("cloud", 2, &GPF::cloud_callback, this);
-    _odom_sub = nh.subscribe("odom", 100, &GPF::odom_callback, this);
-    _cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("dsmp_cloud",10);
-    _meas_pub = nh.advertise<nav_msgs::Odometry>("meas", 100);
-    _pset_pub = nh.advertise<visualization_msgs::MarkerArray>("marker", 10);
-    _post_pub = nh.advertise<nav_msgs::Odometry>("posterior", 100);
+    _cloud_sub = nh.subscribe("cloud", 1, &GPF::cloud_callback, this);
+    _cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("dsmp_cloud",1);
+    _meas_pub = nh.advertise<nav_msgs::Odometry>("meas", 10);
+    _pset_pub = nh.advertise<visualization_msgs::MarkerArray>("marker", 1);
+    _post_pub = nh.advertise<nav_msgs::Odometry>("posterior", 10);
+    _path_pub = nh.advertise<nav_msgs::Path>("path", 1);
 
     // initialize particles pointer
     nh.param("cloud_sigma", _ray_sigma, 1.0);
@@ -49,39 +45,6 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _particles_ptr->set_size(_set_size);
 }
 
-void GPF::odom_callback(const nav_msgs::Odometry &msg) {
-
-    _position_prior.setX(msg.pose.pose.position.x);
-    _position_prior.setY(msg.pose.pose.position.y);
-    _position_prior.setZ(msg.pose.pose.position.z);
-
-    _quaternion_prior.setX(msg.pose.pose.orientation.x);
-    _quaternion_prior.setY(msg.pose.pose.orientation.y);
-    _quaternion_prior.setZ(msg.pose.pose.orientation.z);
-    _quaternion_prior.setW(msg.pose.pose.orientation.w);
-
-    _rotation_prior.setRotation(_quaternion_prior);
-
-    double r, p, y;
-    _rotation_prior.getRPY(r, p, y);
-
-    _theta_prior.setValue(r, p, y);
-
-    _mean_prior[0] = _position_prior.x();
-    _mean_prior[1] = _position_prior.y();
-    _mean_prior[2] = _position_prior.z();
-
-    _mean_prior[3] = _theta_prior.x();
-    _mean_prior[4] = _theta_prior.y();
-    _mean_prior[5] = _theta_prior.z();
-
-    for(int i=0; i<6; i++) {
-        for(int j=0; j<6; j++) {
-            _cov_prior(i,j) = msg.pose.covariance[i*6+j];
-        }
-    }
-}
-
 void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     _laser_time = msg.header.stamp;
 
@@ -97,9 +60,9 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     pcl::transformPointCloud(*_cloud_ptr, *transformed_cloud_ptr, _imu_to_laser_transform);
     _cloud_ptr = transformed_cloud_ptr;
 
-//    // request prior from eskf
-//    _eskf_ptr->get_mean_pose(_mean_prior);
-//    _eskf_ptr->get_cov_pose(_cov_prior);
+    // request prior from eskf
+    _eskf_ptr->get_mean_pose(_mean_prior);
+    _eskf_ptr->get_cov_pose(_cov_prior);
 
     // draw particles and propagate
     _particles_ptr->set_mean(_mean_prior);
@@ -108,21 +71,26 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     _particles_ptr->propagate(_mean_sample, _cov_sample,
                               _mean_posterior, _cov_posterior);
 
-//    // update meas in eskf
-//    _eskf_ptr->update_mean_meas(_mean_posterior);
-//    _eskf_ptr->update_cov_meas(_cov_posterior);
-//    _eskf_ptr->update_meas_flag();
+    // update meas in eskf
+    recover_meas();
+    _eskf_ptr->update_meas_mean(_mean_meas);
+    _eskf_ptr->update_meas_cov(_cov_meas);
+    _eskf_ptr->update_meas_flag();
 
 
     /* TESTING PARTICLE FILTER RESUTLS*/
+//    std::cout<< "mean sample:\n" << _mean_sample.transpose()<<std::endl;
 //    std::cout<< "mean poster:\n" << _mean_posterior.transpose()<<std::endl;
-    std::cout<< "cov prior:\n" << _cov_prior.diagonal().transpose()<<std::endl;
-    std::cout<< "cov poster:\n" << _cov_posterior.diagonal().transpose()<<std::endl;
+//    std::cout<< "mean meas:\n" << _mean_meas.transpose()<<std::endl;
+//    std::cout<< "cov prior:\n" << _cov_prior.diagonal().transpose()<<std::endl;
+//    std::cout<< "cov poster:\n" << _cov_posterior.diagonal().transpose()<<std::endl;
+//    std::cout<< "cov meas:\n" << _cov_meas.diagonal().transpose()<<std::endl;
 
     // publish needed resutls
     publish_pset();
     publish_cloud();
     publish_posterior();
+    publish_path();
 //    publish_meas();
 
 }
@@ -190,6 +158,8 @@ void GPF::recover_meas() {
     check_posdef(_cov_meas);
     K = _cov_sample * ( _cov_sample + _cov_meas).inverse();
     _mean_meas = K.inverse() * (_mean_posterior - _mean_sample) + _mean_sample;
+
+//    std::cout << "K:" << K << std::endl;
 
 }
 
@@ -372,4 +342,28 @@ void GPF::publish_posterior() {
         }
     }
     _post_pub.publish(msg);
+}
+
+void GPF::publish_path() {
+    geometry_msgs::PoseStamped msg;
+
+    msg.header.frame_id = "world";
+    msg.header.stamp = _laser_time;
+
+    msg.pose.position.x = _mean_prior[0];
+    msg.pose.position.y = _mean_prior[1];
+    msg.pose.position.z = _mean_prior[2];
+
+    tf::Quaternion q;
+    q.setRPY(_mean_prior[3], _mean_prior[4], _mean_prior[5]);
+    msg.pose.orientation.x = q.x();
+    msg.pose.orientation.y = q.y();
+    msg.pose.orientation.z = q.z();
+    msg.pose.orientation.w = q.w();
+
+    _path.header.frame_id = "world";
+    _path.header.stamp = _laser_time;
+    _path.poses.push_back(msg);
+
+    _path_pub.publish(_path);
 }
