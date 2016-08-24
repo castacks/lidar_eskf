@@ -27,7 +27,7 @@
 
         <param name="imu_frequency"             value="200"/>
         <param name="sigma_acceleration"        value="5.0"/>
-        <param name="sigma_gyroscop"            value="0.5"/>
+        <param name="sigma_gyroscop"            value="2.0"/>
         <param name="sigma_acceleration_bias"   value="0.02"/>
         <param name="sigma_gyroscope_bias"      value="0.01"/>
         <param name="gravity"                   value="0.0"/>

@@ -60,7 +60,6 @@ ESKF::ESKF(ros::NodeHandle &nh) {
 
     // initialize covariance matrix
     _Sigma.setZero();
-//    _Sigma.block<3,3>(3,3) = 0.01 * Eigen::MatrixXd::Identity(3, 3);
     _Q.setZero();
 
     // gravity
@@ -70,9 +69,10 @@ ESKF::ESKF(ros::NodeHandle &nh) {
     _init_time = true;
 
     // subscriber and publisher
-    _imu_sub = nh.subscribe("/imu", 50, &ESKF::imu_callback, this);
+    _imu_sub  = nh.subscribe("/imu", 50, &ESKF::imu_callback, this);
     _odom_pub = nh.advertise<nav_msgs::Odometry>("odom", 50, true);
     _bias_pub = nh.advertise<geometry_msgs::TwistStamped>("bias", 50, true);
+
     // acc queue
     _acc_queue_count = 0;
 }
@@ -145,8 +145,8 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
     tf::Vector3 grav(0.0, 0.0, -9.82);
     double r, p, y;
     imu_rotation.setRotation(_imu_orientation);
-    imu_rotation.getRPY(r, p, y);
-    imu_rotation.setRPY(r, p, 0.0);
+//    imu_rotation.getRPY(r, p, y);
+//    imu_rotation.setRPY(r, p, 0.0);
 
     _imu_acceleration -= imu_rotation.transpose() * grav;
 //    _imu_acceleration.setZero();
@@ -252,7 +252,7 @@ void ESKF::publish_odom() {
     pose_sigma << _Sigma.block<6,6>(3,3);
 
     twist_sigma << _Sigma.block<3,3>(0,0),      Eigen::MatrixXd::Zero(3,3),
-                   Eigen::MatrixXd::Zero(3,3), _sigma_gyr * Eigen::MatrixXd::Identity(3,3);
+                   Eigen::MatrixXd::Zero(3,3),  _sigma_gyr *_sigma_gyr * Eigen::MatrixXd::Identity(3,3);
 
     for(int i=0; i<6; i++) {
         for(int j=0; j<6; j++) {
