@@ -9,11 +9,15 @@
 #include <Eigen/Dense>
 #include <queue>
 #include <boost/circular_buffer.hpp>
+#include <fstream>
+#include <iostream>
+#include <time.h>
+#include <string>
 
 class ESKF {
 public:
     ESKF(ros::NodeHandle &nh);
-    ~ESKF() {}
+    ~ESKF();
 
     void imu_callback(const sensor_msgs::Imu &msg);
     void update_time(const sensor_msgs::Imu &msg);
@@ -32,6 +36,7 @@ public:
     void update_error();
     void update_state();
     void reset_error();
+    void output_log();
 
 private:
 
@@ -95,6 +100,9 @@ private:
     std::vector<geometry_msgs::Vector3> _acc_queue;
     int _acc_queue_size;
     int _acc_queue_count;
+
+    // log of odom
+    std::vector<nav_msgs::Odometry> _odom_vec;
 
 };
 

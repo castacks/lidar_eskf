@@ -77,6 +77,10 @@ ESKF::ESKF(ros::NodeHandle &nh) {
     _acc_queue_count = 0;
 }
 
+ESKF::~ESKF() {
+    output_log();
+}
+
 void ESKF::imu_callback(const sensor_msgs::Imu &msg) {
     update_time(msg);
     update_imu(msg);
@@ -143,10 +147,7 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
 
     tf::Matrix3x3 imu_rotation;
     tf::Vector3 grav(0.0, 0.0, -9.82);
-    double r, p, y;
     imu_rotation.setRotation(_imu_orientation);
-//    imu_rotation.getRPY(r, p, y);
-//    imu_rotation.setRPY(r, p, 0.0);
 
     _imu_acceleration -= imu_rotation.transpose() * grav;
 //    _imu_acceleration.setZero();
@@ -263,6 +264,7 @@ void ESKF::publish_odom() {
 
     // publish message
     _odom_pub.publish(msg);
+    _odom_vec.push_back(msg);
 }
 
 void ESKF::publish_bias() {
@@ -348,4 +350,8 @@ void ESKF::reset_error() {
     _d_rotation.setIdentity();
     _d_bias_acc.setZero();
     _d_bias_gyr.setZero();
+}
+
+void ESKF::output_log() {
+
 }

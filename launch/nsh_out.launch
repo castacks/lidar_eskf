@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<launch>
+
+	<param name="use_sim_time" value="true" />
+    
+    <node pkg="rosbag" type="play" name="playbag" output="screen"
+          args="--pause --clock --rate 0.5
+                $(find lidar_eskf)/dat/nsh_out/imu_laser_2.bag"/>
+	
+	<node pkg="lidar_eskf" type="lidar_eskf_node" name="lidar_eskf" output="screen">
+	
+	    <remap from="/lidar_eskf/cloud"        to="/sync_cloud"/>
+	    <remap from="/lidar_eskf/scan"         to="/sync_scan"/>
+        <remap from="/imu"                     to="/microstrain/imu"/>
+	    <remap from="/meas"                    to="/lidar_eskf/posterior"/>
+	    
+        <param name="map_file_name"            value="$(find lidar_eskf)/map/nsh_out.bt"/>
+        <param name="octree_resolution"        value="0.1"/>
+        <param name="max_obstacle_dist"        value="1.0"/>
+        <param name="ray_sigma"                value="1.0"/>
+        <param name="cloud_resolution"         value="0.2"/>
+        <param name="cloud_range"              value="10.0"/>
+        <param name="laser_type"               value="laserscan"/>
+        <param name="set_size"                 value="500"/>
+
+        <param name="imu_frequency"             value="50"/>
+        <param name="sigma_acceleration"        value="2.0"/>
+        <param name="sigma_gyroscop"            value="1.0"/>
+        <param name="sigma_acceleration_bias"   value="0.02"/>
+        <param name="sigma_gyroscope_bias"      value="0.01"/>
+        <param name="gravity"                   value="0.0"/>
+        
+        <param name="init_bias_acc_x"           value="0.0"/> #-0.05
+        <param name="init_bias_acc_y"           value="0.0"/> #0.025
+        <param name="init_bias_acc_z"           value="0.0"/> #-0.032
+        
+        <param name="acc_queue_size"            value="5"/>
+
+	</node>
+	
+	<node pkg="octomap_server" type="octomap_server_node" name="eskf_octomap_server" 
+	      args="$(find lidar_eskf)/map/nsh_out.bt">
+	      <param name="frame_id"           value="world"/>
+	      <param name="base_frame_id"      value="world_view"/>
+	</node>
+	
+	<node pkg="rviz" type="rviz" name="gpf_test_rviz" required="false" args="-d $(find lidar_eskf)/rviz/nsh_out.rviz"/>
+</launch>

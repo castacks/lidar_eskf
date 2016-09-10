@@ -10,6 +10,8 @@
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/conditional_removal.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <laser_geometry/laser_geometry.h>
+#include <tf/transform_broadcaster.h>
 
 #include "lidar_eskf/eskf.h"
 #include "lidar_eskf/particles.h"
@@ -20,7 +22,7 @@ public:
     ~GPF() {}
 
     void cloud_callback(const sensor_msgs::PointCloud2 &msg);
-
+    void scan_callback(const sensor_msgs::LaserScan &msg);
     void downsample();
     void recover_meas();
     void check_posdef(Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &R);
@@ -29,6 +31,7 @@ public:
     void publish_meas();
     void publish_pset();
     void publish_path();
+    void publish_tf();
     std::vector< std::vector<double> > compute_color(Particles pSet);
 
 private:
@@ -43,12 +46,16 @@ private:
     Eigen::Matrix<double, 6, 6> _cov_meas;
 
     ros::Subscriber _cloud_sub;
+    ros::Subscriber _scan_sub;
     ros::Publisher  _cloud_pub;
     ros::Publisher  _meas_pub;
     ros::Publisher  _pset_pub;
     ros::Publisher  _post_pub;
     ros::Publisher  _path_pub;
 
+    laser_geometry::LaserProjection _projector;
+    tf::TransformListener _listener;
+    std::string _laser_type;
     ros::Time _laser_time;
 
     boost::shared_ptr<DistMap>          _map_ptr;
@@ -68,6 +75,6 @@ private:
     Eigen::Matrix<double, 4, 4> _imu_to_laser_transform;
 
     nav_msgs::Path _path;
-
+    tf::TransformBroadcaster _tf_br;
 };
 #endif // GPF_H

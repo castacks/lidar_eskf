@@ -2,6 +2,16 @@
 
 GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map_ptr){
 
+    // initialize particles pointer
+    nh.param("cloud_sigma", _ray_sigma, 1.0);
+    nh.param("cloud_resolution", _cloud_resol, 0.2);
+    nh.param("set_size", _set_size, 500);
+    nh.param("cloud_range", _cloud_range, 20.0);
+    nh.param("laser_type", _laser_type,  std::string("pointcloud"));
+    nh.param("imu_to_laser_roll",       _imu_to_laser_roll,     0.0);
+    nh.param("imu_to_laser_pitch",      _imu_to_laser_pitch,    0.0);
+    nh.param("imu_to_laser_yaw",        _imu_to_laser_yaw,      0.0);
+
     _mean_prior.setZero();
     _mean_sample.setZero();
     _mean_posterior.setZero();
@@ -14,21 +24,16 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _cov_posterior.setZero();
     _cov_meas.setZero();
 
+    if(_laser_type.compare("pointcloud") == 0) {
     _cloud_sub = nh.subscribe("cloud", 1, &GPF::cloud_callback, this);
+    } else {
+    _scan_sub = nh.subscribe("scan", 1, &GPF::scan_callback, this);
+    }
     _cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("dsmp_cloud",1);
     _meas_pub = nh.advertise<nav_msgs::Odometry>("meas", 10);
     _pset_pub = nh.advertise<visualization_msgs::MarkerArray>("marker", 1);
     _post_pub = nh.advertise<nav_msgs::Odometry>("posterior", 10);
     _path_pub = nh.advertise<nav_msgs::Path>("path", 1);
-
-    // initialize particles pointer
-    nh.param("cloud_sigma", _ray_sigma, 1.0);
-    nh.param("cloud_resolution", _cloud_resol, 0.2);
-    nh.param("set_size", _set_size, 500);
-    nh.param("cloud_range", _cloud_range, 20.0);
-    nh.param("imu_to_laser_roll",       _imu_to_laser_roll,     0.0);
-    nh.param("imu_to_laser_pitch",      _imu_to_laser_pitch,    0.0);
-    nh.param("imu_to_laser_yaw",        _imu_to_laser_yaw,      0.0);
 
     _imu_to_laser_rotation.setRPY(_imu_to_laser_roll, _imu_to_laser_pitch, _imu_to_laser_yaw);
 
@@ -44,7 +49,23 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _particles_ptr->set_raysigma(_ray_sigma);
     _particles_ptr->set_size(_set_size);
 }
+void GPF::scan_callback(const sensor_msgs::LaserScan &msg) {
+    // convert laser scan to point cloud
 
+    if(!_listener.waitForTransform(
+        msg.header.frame_id,
+        "/coax",
+        msg.header.stamp + ros::Duration().fromSec(msg.ranges.size()*msg.time_increment),
+        ros::Duration(1.0))) {
+        return;
+    }
+
+    sensor_msgs::PointCloud2 cloud;
+    _projector.transformLaserScanToPointCloud("/coax", msg, cloud, _listener, _cloud_range);
+
+    // call cloud_callback function
+    cloud_callback(cloud);
+}
 void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     _laser_time = msg.header.stamp;
 
@@ -92,6 +113,7 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     publish_posterior();
     publish_path();
 //    publish_meas();
+    publish_tf();
 
 }
 
@@ -366,4 +388,14 @@ void GPF::publish_path() {
     _path.poses.push_back(msg);
 
     _path_pub.publish(_path);
+}
+
+void GPF::publish_tf() {
+    tf::Transform transform;
+    transform.setOrigin( tf::Vector3(_mean_prior[0], _mean_prior[1], _mean_prior[2]));
+    tf::Quaternion q;
+    q.setRPY(_mean_prior[3], _mean_prior[4], _mean_prior[5]);
+    transform.setRotation(q);
+    tf::Transform body_to_world = transform.inverse();
+    _tf_br.sendTransform(tf::StampedTransform(body_to_world, _laser_time, "coax", "world"));
 }
