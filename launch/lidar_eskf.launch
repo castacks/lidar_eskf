@@ -22,6 +22,7 @@
         <param name="max_obstacle_dist"        value="0.5"/>
         <param name="ray_sigma"                value="1.0"/>
         <param name="cloud_resolution"         value="0.1"/>
+		<param name="laser_type"               value="pointcloud"/>
         <param name="cloud_range"              value="20.0"/>
         <param name="set_size"                 value="500"/>
 
