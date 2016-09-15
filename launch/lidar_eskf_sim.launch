@@ -16,10 +16,11 @@
         <param name="ray_sigma"                value="1.0"/>
         <param name="cloud_resolution"         value="0.5"/>
         <param name="cloud_range"              value="25.0"/>
+		<param name="laser_type"               value="pointcloud"/>
         <param name="set_size"                 value="500"/>
 
         <param name="imu_frequency"             value="100"/>
-        <param name="sigma_acceleration"        value="2.0"/>
+        <param name="sigma_acceleration"        value="4.0"/>
         <param name="sigma_gyroscop"            value="1.0"/>
         <param name="sigma_acceleration_bias"   value="0.02"/>
         <param name="sigma_gyroscope_bias"      value="0.01"/>

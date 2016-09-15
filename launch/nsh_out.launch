@@ -19,7 +19,7 @@
         <param name="max_obstacle_dist"        value="1.0"/>
         <param name="ray_sigma"                value="1.0"/>
         <param name="cloud_resolution"         value="0.2"/>
-        <param name="cloud_range"              value="5.0"/>
+        <param name="cloud_range"              value="30.0"/>
         <param name="laser_type"               value="laserscan"/>
         <param name="set_size"                 value="500"/>
 
@@ -39,7 +39,7 @@
 	</node>
 	
 	<node pkg="octomap_server" type="octomap_server_node" name="eskf_octomap_server" 
-	      args="$(find lidar_eskf)/map/crop.bt">
+	      args="$(find lidar_eskf)/map/crop_short.bt">
 	      <param name="frame_id"           value="world"/>
 	      <param name="base_frame_id"      value="world_view"/>
 	</node>

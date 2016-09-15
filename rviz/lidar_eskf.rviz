@@ -56,8 +56,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 2.525
-        Min Value: -1.675
+        Max Value: 7.475
+        Min Value: -0.0250008
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -147,7 +147,7 @@ Visualization Manager:
       Marker Topic: /lidar_eskf/marker
       Name: particles
       Namespaces:
-        particle_set: true
+        {}
       Queue Size: 10
       Value: true
     - Alpha: 1
@@ -266,7 +266,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/XYOrbit
-      Distance: 16.3258
+      Distance: 33.3612
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
@@ -278,10 +278,10 @@ Visualization Manager:
         Z: 2.04451e-06
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 1.4148
+      Pitch: 0.00980057
       Target Frame: world
       Value: XYOrbit (rviz)
-      Yaw: 6.25357
+      Yaw: 1.65038
     Saved:
       - Class: rviz/XYOrbit
         Distance: 22.1068
