@@ -1,16 +1,15 @@
 <?xml version="1.0"?>
 <launch>
 
-	<param name="use_sim_time" value="true" />
-    
-	<node pkg="tf" type="static_transform_publisher" name="world_view" args="0 0 0 0 0 3.1415926 world world_view 100"/> 
+    <!-- <param name="use_sim_time" value="true" /> -->
+
 	
 	<node pkg="lidar_eskf" type="lidar_eskf_node" name="lidar_eskf" output="screen">
 	
-	    <remap from="/lidar_eskf/cloud"        to="/dji_sim/laser/pointcloud"/>
+	    <remap from="/lidar_eskf/cloud"        to="/sim_cloud"/>
         <remap from="/imu"                     to="/dji_sim/imu"/>
 	    
-        <param name="map_file_name"            value="$(find lidar_eskf)/map/gazebo_bridge.bt"/>
+        <param name="map_file_name"            value="$(find g2_sim)/map/liberty_tf.bt"/>
         <param name="octree_resolution"        value="0.2"/>
         <param name="max_obstacle_dist"        value="2.5"/>
         <param name="ray_sigma"                value="1.0"/>
@@ -37,11 +36,5 @@
         <param name="imu_to_laser_yaw"             value="0.0"/>
 
 	</node>
-	
-	<node pkg="octomap_server" type="octomap_server_node" name="octomap_server_eskf" 
-	      args="$(find lidar_eskf)/map/gazebo_bridge.bt">
-	      <param name="frame_id"           value="world"/>
-	      <param name="base_frame_id"      value="world_view"/>
-	</node>
-	
+
 </launch>
