@@ -9,6 +9,7 @@
 #include <pcl/keypoints/uniform_sampling.h>
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/conditional_removal.h>
+#include <pcl/io/pcd_io.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <laser_geometry/laser_geometry.h>
 #include <tf/transform_broadcaster.h>
@@ -19,7 +20,7 @@
 class GPF {
 public:
     GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr);
-    ~GPF() {}
+    ~GPF();
 
     void cloud_callback(const sensor_msgs::PointCloud2 &msg);
     void scan_callback(const sensor_msgs::LaserScan &msg);
@@ -32,6 +33,7 @@ public:
     void publish_pset();
     void publish_path();
     void publish_tf();
+    void publish_pose();
     std::vector< std::vector<double> > compute_color(Particles pSet);
 
 private:
@@ -52,14 +54,17 @@ private:
     ros::Publisher  _pset_pub;
     ros::Publisher  _post_pub;
     ros::Publisher  _path_pub;
+    ros::Publisher  _pose_pub;
 
     laser_geometry::LaserProjection _projector;
     tf::TransformListener _listener;
     std::string _laser_type;
     ros::Time _laser_time;
+    std::string _pcd_file;
 
     boost::shared_ptr<DistMap>          _map_ptr;
     pcl::PointCloud<pcl::PointXYZ>::Ptr _cloud_ptr;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr _recmap_ptr;
     boost::shared_ptr<ESKF>             _eskf_ptr;
     boost::shared_ptr<Particles>        _particles_ptr;
 

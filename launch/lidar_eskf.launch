@@ -4,14 +4,14 @@
 	<param name="use_sim_time" value="true" />
     
     <node pkg="rosbag" type="play" name="playbag" output="screen"
-          args="--pause --clock --rate 0.5
+          args="--pause --clock --rate 1
                 $(find lidar_eskf)/dat/NSH1109_circle/lidar.bag
                 $(find lidar_eskf)/dat/NSH1109_circle/imu.bag
                 $(find lidar_eskf)/dat/NSH1109_circle/camera.bag"/>
                 
 	<node pkg="tf" type="static_transform_publisher" name="world_view" args="0 0 0 0 0 3.1415926 world world_view 100"/> 
 	
-	<node pkg="lidar_eskf" type="lidar_eskf_node" name="lidar_eskf" output="screen">
+	<node pkg="lidar_eskf" type="lidar_eskf_node" name="lidar_eskf" output="screen" launch-prefix="xterm -e gdb --args">
 	
 	    <remap from="/lidar_eskf/cloud"        to="/3d_lidar_cloud"/>
         <remap from="/imu"                     to="/imu_driver/imu"/>
@@ -25,7 +25,8 @@
 		<param name="laser_type"               value="pointcloud"/>
         <param name="cloud_range"              value="20.0"/>
         <param name="set_size"                 value="500"/>
-
+        <param name="pcd_file"                 value="$(find lidar_eskf)/dat/recmap_nsh_1109.pcd"/>
+        
         <param name="imu_frequency"             value="200"/>
         <param name="sigma_acceleration"        value="4.0"/>
         <param name="sigma_gyroscop"            value="1.0"/>

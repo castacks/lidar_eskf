@@ -5,7 +5,7 @@
     
     <node pkg="rosbag" type="play" name="playbag" output="screen"
           args="--pause --clock --rate 1
-                $(find lidar_eskf)/dat/nsh_out/imu_laser_2.bag"/>
+                $(find lidar_eskf)/dat/nsh_out/imu_laser_fast.bag"/>
 	
 	<node pkg="lidar_eskf" type="lidar_eskf_node" name="lidar_eskf" output="screen">
 	
@@ -21,8 +21,8 @@
         <param name="cloud_resolution"         value="0.2"/>
         <param name="cloud_range"              value="30.0"/>
         <param name="laser_type"               value="pointcloud"/>
-        <param name="pcd_file"                 value="$(find lidar_eskf)/dat/recmap_nsh_out.pcd"/>
         <param name="set_size"                 value="500"/>
+        <param name="pcd_file"                 value="$(find lidar_eskf)/dat/remap_nsh_fast.pcd"/>
 
         <param name="imu_frequency"             value="50"/>
         <param name="sigma_acceleration"        value="2.0"/>

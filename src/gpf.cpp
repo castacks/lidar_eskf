@@ -3,14 +3,15 @@
 GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map_ptr){
 
     // initialize particles pointer
-    nh.param("cloud_sigma", _ray_sigma, 1.0);
-    nh.param("cloud_resolution", _cloud_resol, 0.2);
-    nh.param("set_size", _set_size, 500);
-    nh.param("cloud_range", _cloud_range, 20.0);
-    nh.param("laser_type", _laser_type,  std::string("pointcloud"));
+    nh.param("cloud_sigma",             _ray_sigma,             1.0);
+    nh.param("cloud_resolution",        _cloud_resol,           0.2);
+    nh.param("set_size",                _set_size,              500);
+    nh.param("cloud_range",             _cloud_range,           20.0);
+    nh.param("laser_type",              _laser_type,            std::string("pointcloud"));
     nh.param("imu_to_laser_roll",       _imu_to_laser_roll,     0.0);
     nh.param("imu_to_laser_pitch",      _imu_to_laser_pitch,    0.0);
     nh.param("imu_to_laser_yaw",        _imu_to_laser_yaw,      0.0);
+    nh.param("pcd_file",                _pcd_file,              std::string("recon.pcd"));
 
     _mean_prior.setZero();
     _mean_sample.setZero();
@@ -34,6 +35,7 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _pset_pub = nh.advertise<visualization_msgs::MarkerArray>("marker", 1);
     _post_pub = nh.advertise<nav_msgs::Odometry>("posterior", 10);
     _path_pub = nh.advertise<nav_msgs::Path>("path", 1);
+    _pose_pub = nh.advertise<geometry_msgs::PoseStamped>("pose", 10);
 
     _imu_to_laser_rotation.setRPY(_imu_to_laser_roll, _imu_to_laser_pitch, _imu_to_laser_yaw);
 
@@ -48,7 +50,16 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _particles_ptr = boost::shared_ptr<Particles> (new Particles(map_ptr));
     _particles_ptr->set_raysigma(_ray_sigma);
     _particles_ptr->set_size(_set_size);
+
+    // reconstruction map initialization
+    _recmap_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
 }
+
+GPF::~GPF() {
+    ROS_INFO("Saving pcd file.");
+    pcl::io::savePCDFileASCII(_pcd_file, *_recmap_ptr);
+}
+
 void GPF::scan_callback(const sensor_msgs::LaserScan &msg) {
     // convert laser scan to point cloud
 
@@ -114,6 +125,7 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     publish_path();
 //    publish_meas();
     publish_tf();
+    publish_pose();
 
 }
 
@@ -335,6 +347,11 @@ void GPF::publish_cloud() {
 
     pcl::transformPointCloud(*_cloud_ptr, cloud, transform);
 
+    // stack into reconstructed map
+    *_recmap_ptr += cloud;
+//    ROS_INFO("gpf: reconstructed map size %d\n", int(_recmap_ptr->size()));
+
+    // publish scan
     sensor_msgs::PointCloud2 msg;
     pcl::toROSMsg(cloud, msg);
 
@@ -398,4 +415,24 @@ void GPF::publish_tf() {
     transform.setRotation(q);
     tf::Transform body_to_world = transform.inverse();
     _tf_br.sendTransform(tf::StampedTransform(body_to_world, _laser_time, "coax", "world"));
+}
+
+void GPF::publish_pose() {
+    geometry_msgs::PoseStamped msg;
+
+    msg.header.frame_id = "world";
+    msg.header.stamp = _laser_time;
+
+    msg.pose.position.x = _mean_prior[0];
+    msg.pose.position.y = _mean_prior[1];
+    msg.pose.position.z = _mean_prior[2];
+
+    tf::Quaternion q;
+    q.setRPY(_mean_prior[3], _mean_prior[4], _mean_prior[5] + M_PI);
+    msg.pose.orientation.w = q.w();
+    msg.pose.orientation.x = q.x();
+    msg.pose.orientation.y = q.y();
+    msg.pose.orientation.z = q.z();
+
+    _pose_pub.publish(msg);
 }
