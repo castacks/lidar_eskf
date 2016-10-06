@@ -287,6 +287,8 @@ void ESKF::publish_bias() {
 void ESKF::update_meas_mean(Eigen::Matrix<double, 6, 1> &mean_meas) {
     _m_position.setValue(mean_meas[0],mean_meas[1],mean_meas[2]);
     _m_theta.setValue(mean_meas[3],mean_meas[4],mean_meas[5]);
+    
+    //std::cout << "eskf: update mean as " << mean_meas.transpose() << std::endl;
 }
 
 void ESKF::update_meas_cov(Eigen::Matrix<double, 6, 6> &cov_meas) {

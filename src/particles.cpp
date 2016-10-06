@@ -205,7 +205,7 @@ void Particles::propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean_prior,
     // weight each particles
     double start = ros::Time::now().toSec();
     weight_set();
-    ROS_INFO("weighting time: %f",ros::Time::now().toSec() - start );
+    //ROS_INFO("weighting time: %f",ros::Time::now().toSec() - start );
 
     // compute weighted mean and cov
     get_posterior();

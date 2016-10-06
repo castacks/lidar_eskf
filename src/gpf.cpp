@@ -95,7 +95,8 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     // request prior from eskf
     _eskf_ptr->get_mean_pose(_mean_prior);
     _eskf_ptr->get_cov_pose(_cov_prior);
-
+    
+    
     // draw particles and propagate
     _particles_ptr->set_mean(_mean_prior);
     _particles_ptr->set_cov(_cov_prior);
@@ -105,6 +106,15 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
 
     // update meas in eskf
     recover_meas();
+    
+    // check if the recovered pseudo mesure is valid
+    for(int i=0; i<_mean_meas.size(); i++) {
+        if(isnan(_mean_meas(i))) return;
+    }
+    for(int i=0; i<_cov_meas.size(); i++) {
+        if(isnan(_cov_meas(i))) return;
+    }
+    // update eskf
     _eskf_ptr->update_meas_mean(_mean_meas);
     _eskf_ptr->update_meas_cov(_cov_meas);
     _eskf_ptr->update_meas_flag();
@@ -119,9 +129,9 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
 //    std::cout<< "cov meas:\n" << _cov_meas.diagonal().transpose()<<std::endl;
 
     // publish needed resutls
-    publish_pset();
+    //publish_pset();
     publish_cloud();
-    publish_posterior();
+    //publish_posterior();
     publish_path();
 //    publish_meas();
     publish_tf();
