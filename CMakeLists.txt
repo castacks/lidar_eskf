@@ -5,7 +5,6 @@ option(WITH_OPENMP      "Build with OpenMP support for multithreading"          
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
-  rospy
   std_msgs
   cmake_modules
   sensor_msgs
@@ -14,13 +13,12 @@ find_package(catkin REQUIRED COMPONENTS
   tf_conversions
   pcl_conversions
   pcl_ros
-  dynamicEDT3D
   laser_geometry
+  dynamicEDT3D
 )
 
 find_package(Boost REQUIRED COMPONENTS system random)
 find_package(Eigen REQUIRED)
-find_package(message_generation)
 find_package(octomap REQUIRED)
 find_package(PCL 1.7 REQUIRED)
 find_package(dynamicEDT3D REQUIRED)
@@ -67,10 +65,10 @@ target_link_libraries(map ${catkin_LIBRARIES})
 add_library(gpf src/gpf.cpp)
 target_link_libraries(gpf eskf particles ${catkin_LIBRARIES})
 
-add_executable(eskf_test src/eskf_test.cpp)
-target_link_libraries(eskf_test eskf ${catkin_LIBRARIES})
-add_executable(gpf_test src/gpf_test.cpp)
-target_link_libraries(gpf_test eskf map gpf particles ${catkin_LIBRARIES} ${PCL_LIBRARY_DIRS})
+#add_executable(eskf_test src/eskf_test.cpp)
+#target_link_libraries(eskf_test eskf ${catkin_LIBRARIES})
+#add_executable(gpf_test src/gpf_test.cpp)
+#target_link_libraries(gpf_test eskf map gpf particles ${catkin_LIBRARIES} ${PCL_LIBRARY_DIRS} ${OCTOMAP_LIBRARY_DIRS})
 
 add_executable(lidar_eskf_node src/lidar_eskf_node.cpp)
-target_link_libraries(lidar_eskf_node eskf map gpf particles ${catkin_LIBRARIES}  )
+target_link_libraries(lidar_eskf_node eskf map gpf particles ${catkin_LIBRARIES} ${OCTOMAP_LIBRARIES} )
