@@ -150,7 +150,7 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
     imu_rotation.setRotation(_imu_orientation);
 
     _imu_acceleration -= imu_rotation.transpose() * grav;
-//    _imu_acceleration.setZero();
+    //_imu_acceleration.setZero();
 }
 
 void ESKF::propagate_state() {

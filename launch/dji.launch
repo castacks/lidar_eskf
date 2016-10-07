@@ -17,17 +17,17 @@
 	    
         <param name="map_file_name"            value="$(find lidar_eskf)/map/$(arg testName).bt"/>
         <param name="octree_resolution"        value="0.1"/>
-        <param name="max_obstacle_dist"        value="1.0"/>
+        <param name="max_obstacle_dist"        value="2.0"/>
         <param name="ray_sigma"                value="1.0"/>
-        <param name="cloud_resolution"         value="0.2"/>
+        <param name="cloud_resolution"         value="0.1"/>
         <param name="cloud_range"              value="30.0"/>
         <param name="laser_type"               value="pointcloud"/>
         <param name="pcd_file"                 value="$(find lidar_eskf)/dat/rec_$(arg testName).pcd"/>
         <param name="set_size"                 value="500"/>
 
         <param name="imu_frequency"             value="50"/>
-        <param name="sigma_acceleration"        value="2.0"/>
-        <param name="sigma_gyroscop"            value="1.0"/>
+        <param name="sigma_acceleration"        value="0.5"/>
+        <param name="sigma_gyroscop"            value="0.1"/>
         <param name="sigma_acceleration_bias"   value="0.02"/>
         <param name="sigma_gyroscope_bias"      value="0.01"/>
         <param name="gravity"                   value="0.0"/>
@@ -36,6 +36,6 @@
         <param name="init_bias_acc_y"           value="0.0"/> #0.025
         <param name="init_bias_acc_z"           value="0.0"/> #-0.032
         
-        <param name="acc_queue_size"            value="5"/>
+        <param name="acc_queue_size"            value="3"/>
     </node>
 </launch>
