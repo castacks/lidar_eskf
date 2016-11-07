@@ -34,6 +34,7 @@ public:
     PointCloud map;
     PointCloud map_tf;
 
+    std::string imu_topic;
     std::string laser_topic;
     std::string laser_type;
     std::string pcd_file;
@@ -44,6 +45,7 @@ public:
     double range_lim;
     double octomap_resolution;
 	bool save_pcd_true;
+	bool imu_distort;
 
     ros::Subscriber imu_sub;
     ros::Subscriber laser_sub;
@@ -65,11 +67,13 @@ BagSaver::BagSaver(ros::NodeHandle nh) {
     nh.getParam("max_range", 		range_lim);
     nh.getParam("laser_type", 		laser_type);
     nh.getParam("target_frame", 	target_frame);
-
+    nh.getParam("imu_distort",          imu_distort);
     nh.getParam("octomap_resolution",   octomap_resolution);
     nh.getParam("bt_file_name",     	bt_file_name);
 	nh.getParam("save_pcd_true",		save_pcd_true);
+	nh.getParam("imu_topic",            imu_topic);
 
+    imu_sub = nh.subscribe(imu_topic, 100, &BagSaver::imu_callback, this);
     if(laser_type == "laserscan") {
         laser_sub = nh.subscribe(laser_topic, 10, &BagSaver::laserscan_callback, this);
     }
@@ -175,24 +179,31 @@ void BagSaver::laserscan_callback(const sensor_msgs::LaserScanConstPtr& msg)
         return;
     }
 
-    sensor_msgs::PointCloud2 cloud;
-    projector.transformLaserScanToPointCloud(target_frame,*msg,cloud,listener);
-    pcl::fromROSMsg(cloud, scan);
+    sensor_msgs::PointCloud2 scan_cloud;
+    projector.transformLaserScanToPointCloud(target_frame,*msg,scan_cloud,listener);
+    pcl::fromROSMsg(scan_cloud, scan);
 
     // filtering
+    PointCloud::Ptr xlim_cloud = PointCloud::Ptr (new PointCloud);
+    PointCloud::Ptr ylim_cloud = PointCloud::Ptr (new PointCloud);
+    PointCloud::Ptr zlim_cloud = PointCloud::Ptr (new PointCloud);
+    
     pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud(scan_ptr);
     pass.setFilterFieldName("x");
     pass.setFilterLimits (-range_lim, range_lim);
-    pass.filter(*scan_ptr);
+    pass.filter(*xlim_cloud);
 
     pass.setFilterFieldName("y");
     pass.setFilterLimits (-range_lim, range_lim);
-    pass.filter(*scan_ptr);
+    pass.filter(*ylim_cloud);
 
     pass.setFilterFieldName("z");
     pass.setFilterLimits (-range_lim, range_lim);
-    pass.filter(*scan_ptr);
+    pass.filter(*zlim_cloud);
+
+    scan_ptr.reset();
+    scan_ptr = zlim_cloud;
 
     // truncate in a bounding range
     pcl::ConditionOr<pcl::PointXYZ>::Ptr rangeCond (new pcl::ConditionOr<pcl::PointXYZ> ());
@@ -215,9 +226,11 @@ void BagSaver::laserscan_callback(const sensor_msgs::LaserScanConstPtr& msg)
     condRem.setKeepOrganized(true);
     condRem.filter (*scan_ptr);
 
+
     // stacking scans
-    for(int i=0; i<scan.size(); i++) {
-        pcl::PointXYZ p = scan[i];
+    PointCloud cloud = *scan_ptr;
+    for(int i=0; i<cloud.size(); i++) {
+        pcl::PointXYZ p = cloud[i];
         map.push_back(p);
     }
 
@@ -296,11 +309,12 @@ int  main (int argc, char** argv)
          rate.sleep();
      }
     
+     saver.stop = true;
+     saver.rotate_pcd();  
      if(saver.save_pcd_true) {
 	 	saver.save_pcd();
 	 }
      ROS_INFO("Start to convert to Octomap, please wait ...");
-     saver.stop = true;
      saver.save_bt();
      return (0);
 }
