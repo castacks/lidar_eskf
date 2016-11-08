@@ -179,9 +179,12 @@ void BagSaver::laserscan_callback(const sensor_msgs::LaserScanConstPtr& msg)
         return;
     }
 
-    sensor_msgs::PointCloud2 scan_cloud;
-    projector.transformLaserScanToPointCloud(target_frame,*msg,scan_cloud,listener);
-    pcl::fromROSMsg(scan_cloud, scan);
+    sensor_msgs::PointCloud2::Ptr scan_cloud_ptr = sensor_msgs::PointCloud2::Ptr (new sensor_msgs::PointCloud2);
+    projector.transformLaserScanToPointCloud(target_frame,*msg,*scan_cloud_ptr,listener);
+    
+    pointcloud_callback(scan_cloud_ptr);
+    
+    /*pcl::fromROSMsg(scan_cloud, scan);
 
     // filtering
     PointCloud::Ptr xlim_cloud = PointCloud::Ptr (new PointCloud);
@@ -230,9 +233,10 @@ void BagSaver::laserscan_callback(const sensor_msgs::LaserScanConstPtr& msg)
     // stacking scans
     PointCloud cloud = *scan_ptr;
     for(int i=0; i<cloud.size(); i++) {
+        std::cout << "number " << cloud.size() << std::endl;
         pcl::PointXYZ p = cloud[i];
         map.push_back(p);
-    }
+    }*/
 
 }
 
