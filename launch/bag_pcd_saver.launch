@@ -4,17 +4,17 @@
 
 	<node pkg="lidar_eskf" type="bag_to_pcd" name="bag_to_pcd" output="screen" required="true">
 		<param name="imu_topic"                 value="/microstrain/imu"/>
-		<param name="laser_topic"               value="/sync_scan"/>
-		<param name="laser_type"                value="laserscan"/>
-		<!-- <param name="laser_type"               value="pointcloud"/> -->
+		<param name="laser_topic"               value="/sync_cloud"/>
+		<!-- <param name="laser_type"                value="laserscan"/> -->
+		<param name="laser_type"               value="pointcloud"/>
 		<param name="laser_freq"                value="40"/>
-		<param name="record_time"               value="80"/>
-		<param name="max_range"                 value="30"/>  
+		<param name="record_time"               value="5"/>
+		<param name="max_range"                 value="1"/>  
 		<param name="target_frame"              value="/coax"/>
 		<param name="bt_file_name"              value="$(find lidar_eskf)/map/$(arg testName).bt"/>
 		<param name="octomap_resolution"        value="0.1"/>
-		<param name="imu_distort"               value="false"/>
-		<param name="save_pcd_true"             value="false"/>
+		<param name="imu_distort"               value="true"/>
+		<param name="save_pcd_true"             value="true"/>
 		<param name="pcd_file_name"             value="$(find lidar_eskf)/map/$(arg testName).pcd"/>
 	</node>
 

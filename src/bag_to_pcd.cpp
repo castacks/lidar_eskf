@@ -117,19 +117,23 @@ void BagSaver::pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& msg)
     PointCloud::Ptr ylim_cloud = PointCloud::Ptr (new PointCloud);
     PointCloud::Ptr zlim_cloud = PointCloud::Ptr (new PointCloud);
     
-    pcl::PassThrough<pcl::PointXYZ> pass;
-    pass.setInputCloud(scan_ptr);
-    pass.setFilterFieldName("x");
-    pass.setFilterLimits (-range_lim, range_lim);
-    pass.filter(*xlim_cloud);
+    pcl::PassThrough<pcl::PointXYZ> pass_x;
+    pass_x.setInputCloud(scan_ptr);
+    pass_x.setFilterFieldName("x");
+    pass_x.setFilterLimits (-range_lim, range_lim);
+    pass_x.filter(*xlim_cloud);
 
-    pass.setFilterFieldName("y");
-    pass.setFilterLimits (-range_lim, range_lim);
-    pass.filter(*ylim_cloud);
+    pcl::PassThrough<pcl::PointXYZ> pass_y;
+    pass_y.setInputCloud(xlim_cloud);
+    pass_y.setFilterFieldName("y");
+    pass_y.setFilterLimits (-range_lim, range_lim);
+    pass_y.filter(*ylim_cloud);
 
-    pass.setFilterFieldName("z");
-    pass.setFilterLimits (-range_lim, range_lim);
-    pass.filter(*zlim_cloud);
+    pcl::PassThrough<pcl::PointXYZ> pass_z;
+    pass_z.setInputCloud(ylim_cloud);
+    pass_z.setFilterFieldName("z");
+    pass_z.setFilterLimits (-range_lim, range_lim);
+    pass_z.filter(*zlim_cloud);
 
     scan_ptr.reset();
     scan_ptr = zlim_cloud;
@@ -260,7 +264,11 @@ void BagSaver::rotate_pcd() {
     pcl::transformPointCloud(map, map_tf, T);
 }
 void BagSaver::save_pcd() {
-    pcl::io::savePCDFileASCII (pcd_file, map_tf);
+	if(imu_distort == true) {
+    	pcl::io::savePCDFileASCII (pcd_file, map_tf);
+	} else {
+		pcl::io::savePCDFileASCII (pcd_file, map);
+	}
 
 }
 
@@ -271,12 +279,21 @@ void BagSaver::save_bt() {
     octomap::pose6d frame_origin(0.0, 0, 0, 0, 0, 0);
     octomap::Pointcloud octomap_cloud;
 
-    for (unsigned int pt_idx = 0; pt_idx < map_tf.points.size(); ++pt_idx)
-    {
-      const PointT& p = map_tf.points[pt_idx];
-      if (!std::isnan(p.z))
-        octomap_cloud.push_back(p.x, p.y, p.z);
-    }
+    if(imu_distort == true) {
+		for (unsigned int pt_idx = 0; pt_idx < map_tf.points.size(); ++pt_idx)
+		{
+		  const PointT& p = map_tf.points[pt_idx];
+		  if (!std::isnan(p.z))
+		    octomap_cloud.push_back(p.x, p.y, p.z);
+		}
+	} else {
+		for (unsigned int pt_idx = 0; pt_idx < map.points.size(); ++pt_idx)
+		{
+		  const PointT& p = map.points[pt_idx];
+		  if (!std::isnan(p.z))
+		    octomap_cloud.push_back(p.x, p.y, p.z);
+		}
+	}
 
     // insert scan (only xyz considered, no colors)
     tree.insertPointCloud(octomap_cloud, sensor_origin, frame_origin);
