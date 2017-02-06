@@ -13,6 +13,7 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <laser_geometry/laser_geometry.h>
 #include <tf/transform_broadcaster.h>
+#include <pcl_ros/transforms.h>
 
 #include "lidar_eskf/eskf.h"
 #include "lidar_eskf/particles.h"
@@ -61,6 +62,7 @@ private:
     std::string _laser_type;
     ros::Time _laser_time;
     std::string _pcd_file;
+    std::string _robot_frame;
 
     boost::shared_ptr<DistMap>          _map_ptr;
     pcl::PointCloud<pcl::PointXYZ>::Ptr _cloud_ptr;

@@ -10,7 +10,7 @@
 		<param name="laser_freq"                value="40"/>
 		<param name="record_time"               value="5"/>
 		<param name="max_range"                 value="1"/>  
-		<param name="target_frame"              value="/coax"/>
+		<param name="robot_frame"              value="/coax"/>
 		<param name="bt_file_name"              value="$(find lidar_eskf)/map/$(arg testName).bt"/>
 		<param name="octomap_resolution"        value="0.1"/>
 		<param name="imu_distort"               value="true"/>

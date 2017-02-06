@@ -12,7 +12,7 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     nh.param("imu_to_laser_pitch",      _imu_to_laser_pitch,    0.0);
     nh.param("imu_to_laser_yaw",        _imu_to_laser_yaw,      0.0);
     nh.param("pcd_file",                _pcd_file,              std::string("recon.pcd"));
-
+    nh.param("robot_frame",             _robot_frame,           std::string("/coax"));
     _mean_prior.setZero();
     _mean_sample.setZero();
     _mean_posterior.setZero();
@@ -65,14 +65,14 @@ void GPF::scan_callback(const sensor_msgs::LaserScan &msg) {
 
     if(!_listener.waitForTransform(
         msg.header.frame_id,
-        "/coax",
+        _robot_frame,
         msg.header.stamp + ros::Duration().fromSec(msg.ranges.size()*msg.time_increment),
         ros::Duration(1.0))) {
         return;
     }
 
     sensor_msgs::PointCloud2 cloud;
-    _projector.transformLaserScanToPointCloud("/coax", msg, cloud, _listener, _cloud_range);
+    _projector.transformLaserScanToPointCloud(_robot_frame, msg, cloud, _listener, _cloud_range);
 
     // call cloud_callback function
     cloud_callback(cloud);
@@ -81,11 +81,20 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     _laser_time = msg.header.stamp;
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::fromROSMsg(msg, *cloud_ptr);
+    pcl::PointCloud<pcl::PointXYZ>  cloud_temp;
+    pcl::fromROSMsg(msg, cloud_temp);
+    if(!_listener.waitForTransform(
+		msg.header.frame_id,
+		_robot_frame,
+		ros::Time::now(),
+		ros::Duration(1.0))) {
+        return;
+    }
+
+    pcl_ros::transformPointCloud(_robot_frame, cloud_temp, *cloud_ptr, _listener);
     _cloud_ptr = cloud_ptr;
 
     downsample();
-//    ROS_INFO("GPF: cloud size = %d", (int)_cloud_ptr->size());
 
     // transform to imu frame
     pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
