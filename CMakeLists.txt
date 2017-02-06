@@ -70,7 +70,7 @@ target_link_libraries(gpf eskf particles ${catkin_LIBRARIES})
 #add_executable(gpf_test src/gpf_test.cpp)
 #target_link_libraries(gpf_test eskf map gpf particles ${catkin_LIBRARIES} ${PCL_LIBRARY_DIRS} ${OCTOMAP_LIBRARY_DIRS})
 add_executable(bag_to_pcd src/bag_to_pcd.cpp)
-target_link_libraries(bag_to_pcd ${PCL_LIBRARY_DIRS} ${catkin_LIBRARIES})
+target_link_libraries(bag_to_pcd ${PCL_LIBRARY_DIRS} ${catkin_LIBRARIES} ${OCTOMAP_LIBRARIES})
 
 add_executable(lidar_eskf_node src/lidar_eskf_node.cpp)
 target_link_libraries(lidar_eskf_node eskf map gpf particles ${catkin_LIBRARIES} ${OCTOMAP_LIBRARIES} )
