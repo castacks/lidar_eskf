@@ -19,6 +19,7 @@
 #include <numeric>
 #include <functional>
 #include <iostream>
+#include <deque>
 
 #include "lidar_eskf/eskf.h"
 #include "lidar_eskf/particles.h"
@@ -86,6 +87,7 @@ private:
     Eigen::Matrix<double, 4, 4> _imu_to_laser_transform;
 
     nav_msgs::Path _path;
+    std::deque<geometry_msgs::PoseStamped> _pose_deque;
     tf::TransformBroadcaster _tf_br;
 };
 #endif // GPF_H

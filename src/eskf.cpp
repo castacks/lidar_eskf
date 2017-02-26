@@ -32,7 +32,7 @@ ESKF::ESKF(ros::NodeHandle &nh) {
     nh.param("init_yaw",                _init_yaw,         0.0);
     
     nh.param("sigma_acceleration",      _sigma_acc,        0.1);
-    nh.param("sigma_gyroscop",          _sigma_gyr,        0.01);
+    nh.param("sigma_gyroscope",         _sigma_gyr,        0.01);
     nh.param("sigma_acceleration_bias", _sigma_bias_acc,   0.0001);
     nh.param("sigma_gyroscope_bias",    _sigma_bias_gyr,   0.00001);
     nh.param("gravity",                 _g,                9.82);

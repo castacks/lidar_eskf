@@ -281,7 +281,7 @@ int  main (int argc, char** argv)
              init = false;
          }
          toc = ros::Time::now().toSec();
-         ROS_INFO("time = %0.2f / %0.2f", toc-tic, saver.record_time);
+         ROS_INFO_STREAM_THROTTLE(1.0, "time = " << toc-tic << "/" << saver.record_time);
          ros::spinOnce();
          rate.sleep();
      }

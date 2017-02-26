@@ -144,7 +144,7 @@ void GPF::scan_callback(const sensor_msgs::LaserScan &msg) {
 }
 void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     _laser_time = msg.header.stamp;
-    ROS_INFO("GPF:cloud callback.");
+    //ROS_INFO("GPF:cloud callback.");
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>  cloud_temp;
     pcl::fromROSMsg(msg, cloud_temp);
@@ -160,10 +160,10 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     pcl_ros::transformPointCloud(_robot_frame, cloud_temp, *cloud_ptr, _listener);
     _cloud_ptr = cloud_ptr;
 
-    ROS_INFO("GPF: before downsample");
-//    downsample();
+    //ROS_INFO("GPF: before downsample");
+    downsample();
 
-    structure_resample();
+    //structure_resample();
 
     // transform to imu frame
     pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
@@ -208,7 +208,7 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
 
     // publish needed resutls
     publish_pset();
-//    publish_cloud();
+    publish_cloud();
     //publish_posterior();
     publish_path();
 //    publish_meas();
@@ -219,9 +219,9 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
 
 void GPF::downsample() {
     pcl::PointCloud<pcl::PointXYZ>::Ptr unif_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr xlim_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
+    /*pcl::PointCloud<pcl::PointXYZ>::Ptr xlim_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr ylim_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr zlim_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr zlim_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);*/
 
     // down sampling
     pcl::PointCloud<int> sampled_indices;
@@ -232,7 +232,7 @@ void GPF::downsample() {
     pcl::copyPointCloud (*_cloud_ptr, sampled_indices.points, *unif_cloud);
 
     // truncating in range
-    pcl::PassThrough<pcl::PointXYZ> pass;
+    /*pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud(unif_cloud);
     pass.setFilterFieldName("x");
     pass.setFilterLimits (-_cloud_range, _cloud_range);
@@ -270,12 +270,25 @@ void GPF::downsample() {
     condRem.setCondition((rangeCond));
     condRem.setInputCloud(_cloud_ptr);
     condRem.setKeepOrganized(true);
-    condRem.filter (*_cloud_ptr);
+    condRem.filter (*_cloud_ptr);*/
+
+    _cloud_ptr->clear();
+    for(pcl::PointCloud<pcl::PointXYZ>::iterator it = unif_cloud->begin();
+		                                 it != unif_cloud->end();
+						 it ++) {
+	double dist = sqrt(it->x * it->x + it->y * it->y + it->z * it->z);
+
+	if (dist > 0.9 && dist < _cloud_range) {
+	    _cloud_ptr->push_back(*it);
+	}
+    }
+
+    ROS_INFO_STREAM_THROTTLE(1.0, "GPF: Cloud size " << int(_cloud_ptr->size()));
 }
 
 void GPF::structure_resample() {
     if(!_cloud_ptr) {
-        ROS_INFO("GPF: cloud ptr is null");
+        ROS_WARN("GPF: cloud ptr is null");
         return;
     }
     // Remove points too close or too far
@@ -283,7 +296,7 @@ void GPF::structure_resample() {
     for(pcl::PointCloud<pcl::PointXYZ>::iterator it = _cloud_ptr->begin(); it != _cloud_ptr->end(); it++) {
         pcl::PointXYZ p = *it;
         double d = sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
-        if(d <= _cloud_range && d >= 0.5) {
+        if(d <= _cloud_range && d >= 0.8) {
             cloud.push_back(p);
         }
     }
@@ -297,14 +310,23 @@ void GPF::structure_resample() {
         if(i-hfwin_size < 0 || i+hfwin_size >= cloud.size()) {
             score[i] = 0.5;
         } else {
-            pcl::CentroidPoint<pcl::PointXYZ> lf_c, rg_c;
+            /*pcl::CentroidPoint<pcl::PointXYZ> lf_c, rg_c;
             for(int k=1; k <= hfwin_size; k++) {
                 lf_c.add(cloud[i-k]);
                 rg_c.add(cloud[i+k]);
             }
             pcl::PointXYZ lf_m, rg_m;
             lf_c.get(lf_m);
-            rg_c.get(rg_m);
+            rg_c.get(rg_m);*/
+            pcl::PointXYZ lf_c, rg_c;
+	    lf_c.x = 0.0; lf_c.y = 0.0; lf_c.z = 0.0; 
+	    rg_c.x = 0.0; rg_c.y = 0.0; rg_c.z = 0.0;
+	    for(int k=1; k<= hfwin_size; k++) {
+	        lf_c = add(lf_c, cloud[i-k]);
+		rg_c = add(rg_c, cloud[i+k]);
+	    }
+	    pcl::PointXYZ lf_m = multiply(lf_c, 1.0/hfwin_size);
+	    pcl::PointXYZ rg_m = multiply(rg_c, 1.0/hfwin_size);
             pcl::PointXYZ lf_v, rg_v;
             lf_v = minus(lf_m, cloud[i]);
             rg_v = minus(rg_m, cloud[i]);
@@ -316,16 +338,16 @@ void GPF::structure_resample() {
 
     // Sort the computed score
     std::vector<size_t> idx = sort_index(score);
-    ROS_INFO("GPF: sorted score.");
+    //ROS_INFO("GPF: sorted score.");
 
     // Looking for 100 feature points, 400 plane points
     pcl::PointCloud<pcl::PointXYZ> edge_cloud;
     pcl::PointCloud<pcl::PointXYZ> plane_cloud;
     for(int i=0; i<cloud.size(); i++) {
-        if(score[idx[i]] > 0.6) {
+        if(score[idx[i]] > 0.2) {
             edge_cloud.push_back(cloud[idx[i]]);
         }
-        if(edge_cloud.size() >= 200) {
+        if(edge_cloud.size() >= 600) {
             break;
         }
     }
@@ -333,7 +355,7 @@ void GPF::structure_resample() {
         if(score[idx[i]] < 0.2) {
             plane_cloud.push_back(cloud[idx[i]]);
         }
-        if(plane_cloud.size() >= 400) {
+        if(plane_cloud.size() >= 200) {
             break;
         }
     }
@@ -496,16 +518,21 @@ std::vector< std::vector<double> > GPF::compute_color(Particles pSet) {
 void GPF::publish_cloud() {
     pcl::PointCloud<pcl::PointXYZ> cloud;
     Eigen::Matrix4d transform;
-    Eigen::Matrix3d rotation;
-    Eigen::Vector3d translation;
+    //Eigen::Matrix3d rotation;
+    //Eigen::Vector3d translation;
 
-    translation << _mean_prior[0], _mean_prior[1], _mean_prior[2];
+    //translation << _mean_prior[0], _mean_prior[1], _mean_prior[2];
 
-    rotation = Eigen::AngleAxisd(_mean_prior[3], Eigen::Vector3d(1.0,0.0,0.0))
-             * Eigen::AngleAxisd(_mean_prior[4], Eigen::Vector3d(0.0,1.0,0.0))
-             * Eigen::AngleAxisd(_mean_prior[5], Eigen::Vector3d(0.0,0.0,1.0));
+    //rotation = Eigen::AngleAxisd(_mean_prior[3], Eigen::Vector3d(1.0,0.0,0.0))
+    //         * Eigen::AngleAxisd(_mean_prior[4], Eigen::Vector3d(0.0,1.0,0.0))
+    //         * Eigen::AngleAxisd(_mean_prior[5], Eigen::Vector3d(0.0,0.0,1.0));
 
-    transform << rotation, translation,
+    tf::Matrix3x3 rotation;
+    rotation.setRPY(_mean_prior[3], _mean_prior[4], _mean_prior[5]);
+   
+    transform << rotation[0][0],rotation[0][1],rotation[0][2], _mean_prior[0],
+                 rotation[1][0],rotation[1][1],rotation[1][2], _mean_prior[1],
+                 rotation[2][0],rotation[2][1],rotation[2][2], _mean_prior[2],
                  0, 0, 0, 1;
 
     pcl::transformPointCloud(*_cloud_ptr, cloud, transform);
@@ -562,10 +589,18 @@ void GPF::publish_path() {
     msg.pose.orientation.y = q.y();
     msg.pose.orientation.z = q.z();
     msg.pose.orientation.w = q.w();
+    
+    _pose_deque.push_back(msg);
+    if(_pose_deque.size() > 400) {
+	    _pose_deque.pop_front();
+    }
 
+    _path.poses.clear();
     _path.header.frame_id = "world";
     _path.header.stamp = _laser_time;
-    _path.poses.push_back(msg);
+    for(int i=0; i<_pose_deque.size(); i++) {
+    	_path.poses.push_back(_pose_deque[i]);
+    }
 
     _path_pub.publish(_path);
 }
