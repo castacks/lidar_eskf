@@ -30,7 +30,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: map
+    SyncSource: dsmp_scan
 Visualization Manager:
   Class: ""
   Displays:
@@ -135,19 +135,48 @@ Visualization Manager:
       Unreliable: false
       Value: true
     - Class: rviz/TF
-      Enabled: false
+      Enabled: true
       Frame Timeout: 15
       Frames:
         All Enabled: false
+        base_frame:
+          Value: true
+        base_frame_view:
+          Value: true
+        imu:
+          Value: true
+        laser_shaft:
+          Value: true
+        motor_base:
+          Value: true
+        motor_shaft:
+          Value: true
+        velodyne:
+          Value: true
+        world:
+          Value: true
+        world_view:
+          Value: true
       Marker Scale: 2
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: false
       Tree:
-        {}
+        world:
+          base_frame:
+            base_frame_view:
+              {}
+            imu:
+              motor_base:
+                motor_shaft:
+                  laser_shaft:
+                    velodyne:
+                      {}
+          world_view:
+            {}
       Update Interval: 0
-      Value: false
+      Value: true
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /lidar_eskf/marker

@@ -147,12 +147,14 @@ void Particles::reproject_cloud(Particle &p, pcl::PointCloud<pcl::PointXYZ> &clo
     tf::Matrix3x3 rotation;
     tf::Vector3 translation;
     Eigen::Matrix4d transform;
+
     translation.setValue(p.state[0], p.state[1], p.state[2]);
     rotation.setRPY(p.state[3], p.state[4], p.state[5]);
     transform << rotation[0][0], rotation[0][1], rotation[0][2], translation[0],
                  rotation[1][0], rotation[1][1], rotation[1][2], translation[1],
                  rotation[2][0], rotation[2][1], rotation[2][2], translation[2],
                  0,0,0,1;
+>>>>>>> c82651dc20197a325b6ee0062be13b11142936f0
 
     pcl::transformPointCloud(*_cloud_ptr, cloud, transform);
 }
