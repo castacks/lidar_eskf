@@ -154,7 +154,6 @@ void Particles::reproject_cloud(Particle &p, pcl::PointCloud<pcl::PointXYZ> &clo
                  rotation[1][0], rotation[1][1], rotation[1][2], translation[1],
                  rotation[2][0], rotation[2][1], rotation[2][2], translation[2],
                  0,0,0,1;
->>>>>>> c82651dc20197a325b6ee0062be13b11142936f0
 
     pcl::transformPointCloud(*_cloud_ptr, cloud, transform);
 }
