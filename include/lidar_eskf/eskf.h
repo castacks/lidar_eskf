@@ -13,7 +13,9 @@
 #include <iostream>
 #include <time.h>
 #include <string>
-
+#include <tf/transform_listener.h>
+#include <vector>
+#include <numeric>
 class ESKF {
 public:
     ESKF(ros::NodeHandle &nh);
@@ -74,7 +76,7 @@ private:
     tf::Vector3 _gravity;
 
     // time relatives
-    ros::Time _imu_time;
+    ros::Time _imu_time; 
     double _dt, _imu_freq;
     bool _init_time;
 
@@ -84,7 +86,7 @@ private:
 
     // initialization params
     double _init_bias_acc_x, _init_bias_acc_y, _init_bias_acc_z;
-
+    double _init_roll, _init_pitch, _init_yaw;
     // subscriber and publisher
     ros::Subscriber _imu_sub;
     ros::Publisher  _odom_pub, _bias_pub;
@@ -103,6 +105,25 @@ private:
 
     // log of odom
     std::vector<nav_msgs::Odometry> _odom_vec;
+    
+    // frames
+    std::string _imu_frame, _robot_frame;
+   
+    // imu related
+    bool _imu_enabled, _imu_has_quat;
+    tf::TransformListener _tf_listener;
+
+    // smoother
+    bool _smooth_enabled;
+    int _smooth_buf_size;
+    int _smooth_buf_cnt;
+    std::string _smooth_type;
+    std::vector<double> _x_buf;
+    std::vector<double> _y_buf;
+    std::vector<double> _z_buf;
+    std::vector<double> _vx_buf;
+    std::vector<double> _vy_buf;
+    std::vector<double> _vz_buf;
 
 };
 

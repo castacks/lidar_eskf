@@ -17,7 +17,20 @@ inline tf::Matrix3x3 skew(tf::Vector3 w) {
 
 ESKF::ESKF(ros::NodeHandle &nh) {
 
+    
     nh.param("imu_frequency",           _imu_freq,         50.0);
+    nh.param("imu_frame",               _imu_frame,        std::string("/imu"));
+    nh.param("robot_frame",             _robot_frame,      std::string("/base_frame"));
+    nh.param("imu_enabled",             _imu_enabled,      false);
+    nh.param("imu_has_quat",            _imu_has_quat,     false);
+    nh.param("smooth_enabled",          _smooth_enabled,   false);
+    nh.param("smooth_buf_size",         _smooth_buf_size,  5);
+    nh.param("smooth_type",             _smooth_type,      std::string("mean"));
+    
+    nh.param("init_roll",               _init_roll,        0.0);
+    nh.param("init_pitch",              _init_pitch,       0.0);
+    nh.param("init_yaw",                _init_yaw,         0.0);
+    
     nh.param("sigma_acceleration",      _sigma_acc,        0.1);
     nh.param("sigma_gyroscop",          _sigma_gyr,        0.01);
     nh.param("sigma_acceleration_bias", _sigma_bias_acc,   0.0001);
@@ -30,8 +43,9 @@ ESKF::ESKF(ros::NodeHandle &nh) {
 
     // initialize nomial states
     _velocity.setZero();
-    _rotation.setIdentity();
-    _quaternion.setRPY(0.0, 0.0, 0.0);
+    _quaternion.setRPY(_init_roll, _init_pitch, _init_yaw);
+    _rotation.setRotation(_quaternion);
+    
     _position.setZero();
     _bias_acc.setValue(_init_bias_acc_x, _init_bias_acc_y, _init_bias_acc_z);
     _bias_gyr.setZero();
@@ -75,10 +89,19 @@ ESKF::ESKF(ros::NodeHandle &nh) {
 
     // acc queue
     _acc_queue_count = 0;
+    
+    //smoother
+    _smooth_buf_cnt = 0;
+    _x_buf.resize(_smooth_buf_size);
+    _y_buf.resize(_smooth_buf_size);
+    _z_buf.resize(_smooth_buf_size);
+    _vx_buf.resize(_smooth_buf_size);
+    _vy_buf.resize(_smooth_buf_size);
+    _vz_buf.resize(_smooth_buf_size);
 }
 
 ESKF::~ESKF() {
-    output_log();
+    //output_log();
 }
 
 void ESKF::imu_callback(const sensor_msgs::Imu &msg) {
@@ -134,7 +157,7 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
         }
         _imu_acceleration = acc_avg;
     }
-    _acc_queue_count++;
+    _acc_queue_count++; 
 
     _imu_angular_velocity.setX(msg.angular_velocity.x);
     _imu_angular_velocity.setY(msg.angular_velocity.y);
@@ -145,12 +168,40 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
     _imu_orientation.setZ(msg.orientation.z);
     _imu_orientation.setW(msg.orientation.w);
 
-    tf::Matrix3x3 imu_rotation;
-    tf::Vector3 grav(0.0, 0.0, -9.82);
-    imu_rotation.setRotation(_imu_orientation);
+    //_imu_acceleration -= imu_rotation.transpose() * grav;
+    if(!_imu_enabled) {
+        _imu_acceleration.setZero();
+        _gravity.setZero();
+    } else {
+        if(_imu_has_quat) {
+            tf::Matrix3x3 imu_rot(_imu_orientation);
+            tf::Vector3 grav(0.0, 0.0, _g);
+            _imu_acceleration += imu_rot.transpose() * grav;
+            _gravity.setZero();
+        } //else {
+        //    _gravity.setValue(0.0, 0.0, _g);
+	//}
+    }
 
-    _imu_acceleration -= imu_rotation.transpose() * grav;
-    //_imu_acceleration.setZero();
+    // reproject imu to body frame
+    tf::StampedTransform transform;
+    try{
+        _tf_listener.lookupTransform(_robot_frame, _imu_frame, _imu_time, transform);
+        tf::Matrix3x3 R = transform.getBasis();
+        _imu_acceleration = R * _imu_acceleration;
+        _imu_angular_velocity = R * _imu_angular_velocity;
+        //if(_imu_enabled) { 
+        //    if(!_imu_has_quat) {
+	//	    _gravity.setValue(0.0, 0.0, _g);
+	//    }
+        //}
+        //ROS_INFO("ESKF: Rotation = %0.2f %0.2f %0.2f ", R[0][0],R[1][1],R[2][2]);
+    } catch (tf::TransformException ex){
+        ROS_WARN("ESKF: imu to body transform not found. ");
+        //_imu_acceleration.setZero();
+        //_imu_angular_velocity.setZero();
+        //_gravity.setZero();
+    }
 }
 
 void ESKF::propagate_state() {
@@ -231,21 +282,67 @@ void ESKF::publish_odom() {
     msg.header.frame_id = "world";
     msg.header.stamp = _imu_time;
 
+    // smoother the trajectory
+    _x_buf[_smooth_buf_cnt] = _position.x();
+    _y_buf[_smooth_buf_cnt] = _position.y();
+    _z_buf[_smooth_buf_cnt] = _position.z();
+    _vx_buf[_smooth_buf_cnt] = _velocity.x();
+    _vy_buf[_smooth_buf_cnt] = _velocity.y();
+    _vz_buf[_smooth_buf_cnt] = _velocity.z();
+    _smooth_buf_cnt = (_smooth_buf_cnt + 1) % _smooth_buf_size;
+
     // fill in pose and twist
-    msg.pose.pose.position.x = _position.x();
-    msg.pose.pose.position.y = _position.y();
-    msg.pose.pose.position.z = _position.z();
+    if(!_smooth_enabled) {
+        msg.pose.pose.position.x = _position.x();
+        msg.pose.pose.position.y = _position.y();
+        msg.pose.pose.position.z = _position.z();
+        msg.twist.twist.linear.x = _velocity.x();
+        msg.twist.twist.linear.y = _velocity.y();
+        msg.twist.twist.linear.z = _velocity.z();
+
+    } else {
+        if(_smooth_type.compare("median") == 1) {
+	    std::vector<double> x_buf, y_buf, z_buf, vx_buf, vy_buf, vz_buf;
+    	    x_buf = _x_buf;
+      	    y_buf = _y_buf;
+	    z_buf = _z_buf;
+	    vx_buf = _vx_buf;
+	    vy_buf = _vy_buf;
+	    vz_buf = _vz_buf;
+	    std::sort(x_buf.begin(), x_buf.end());
+	    std::sort(y_buf.begin(), y_buf.end());
+	    std::sort(z_buf.begin(), z_buf.end());
+	    std::sort(vx_buf.begin(), vx_buf.end());
+	    std::sort(vy_buf.begin(), vy_buf.end());
+	    std::sort(vz_buf.begin(), vz_buf.end());
+	    msg.pose.pose.position.x = x_buf[_smooth_buf_size/2];
+            msg.pose.pose.position.y = y_buf[_smooth_buf_size/2];
+	    msg.pose.pose.position.z = z_buf[_smooth_buf_size/2];
+	    msg.twist.twist.linear.x = vx_buf[_smooth_buf_size/2];
+	    msg.twist.twist.linear.y = vy_buf[_smooth_buf_size/2];
+	    msg.twist.twist.linear.z = vz_buf[_smooth_buf_size/2];
+        } else {
+            msg.pose.pose.position.x = std::accumulate(_x_buf.begin(), _x_buf.end(), 0.0)/(double)_smooth_buf_size;
+            msg.pose.pose.position.y = std::accumulate(_y_buf.begin(), _y_buf.end(), 0.0)/(double)_smooth_buf_size;
+            msg.pose.pose.position.z = std::accumulate(_z_buf.begin(), _z_buf.end(), 0.0)/(double)_smooth_buf_size;
+            msg.twist.twist.linear.x = std::accumulate(_vx_buf.begin(),_vx_buf.end(), 0.0)/(double)_smooth_buf_size;
+            msg.twist.twist.linear.y = std::accumulate(_vy_buf.begin(),_vy_buf.end(), 0.0)/(double)_smooth_buf_size;
+            msg.twist.twist.linear.z = std::accumulate(_vz_buf.begin(),_vz_buf.end(), 0.0)/(double)_smooth_buf_size; 
+        }
+    }
+
+
     msg.pose.pose.orientation.x = _quaternion.x();
     msg.pose.pose.orientation.y = _quaternion.y();
     msg.pose.pose.orientation.z = _quaternion.z();
     msg.pose.pose.orientation.w = _quaternion.w();
-
+    //double r, p, y;
+    //tf::Matrix3x3 R(_quaternion);
+    //R.getRPY(r, p, y);
+    //ROS_INFO("ESKF: odom roll pitch yaw: [%0.2f, %0.2f, %0.2f]", r, p, y);
     msg.twist.twist.angular.x = _imu_angular_velocity.x();
     msg.twist.twist.angular.y = _imu_angular_velocity.y();
     msg.twist.twist.angular.z = _imu_angular_velocity.z();
-    msg.twist.twist.linear.x = _velocity.x();
-    msg.twist.twist.linear.y = _velocity.y();
-    msg.twist.twist.linear.z = _velocity.z();
 
     // fill in covariance
     Eigen::Matrix<double, 6, 6> pose_sigma, twist_sigma;

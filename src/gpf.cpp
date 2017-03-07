@@ -67,7 +67,8 @@ void GPF::scan_callback(const sensor_msgs::LaserScan &msg) {
         msg.header.frame_id,
         _robot_frame,
         msg.header.stamp + ros::Duration().fromSec(msg.ranges.size()*msg.time_increment),
-        ros::Duration(1.0))) {
+        ros::Duration(0.1))) {
+        ROS_WARN("GPF: scan transform is not found, time out.");
         return;
     }
 
@@ -86,8 +87,9 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     if(!_listener.waitForTransform(
 		msg.header.frame_id,
 		_robot_frame,
-		ros::Time::now(),
-		ros::Duration(1.0))) {
+		msg.header.stamp,
+		ros::Duration(0.1))) {
+        ROS_WARN("GPF: cloud transform is not found, time out.");
         return;
     }
 
@@ -144,7 +146,7 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     publish_path();
 //    publish_meas();
     publish_tf();
-    publish_pose();
+    //publish_pose();
 
 }
 
@@ -367,7 +369,7 @@ void GPF::publish_cloud() {
     pcl::transformPointCloud(*_cloud_ptr, cloud, transform);
 
     // stack into reconstructed map
-    *_recmap_ptr += cloud;
+    //*_recmap_ptr += cloud;
 //    ROS_INFO("gpf: reconstructed map size %d\n", int(_recmap_ptr->size()));
 
     // publish scan
@@ -427,13 +429,15 @@ void GPF::publish_path() {
 }
 
 void GPF::publish_tf() {
+    //ROS_INFO("GPF: Publishing tf.");
     tf::Transform transform;
     transform.setOrigin( tf::Vector3(_mean_prior[0], _mean_prior[1], _mean_prior[2]));
     tf::Quaternion q;
     q.setRPY(_mean_prior[3], _mean_prior[4], _mean_prior[5]);
     transform.setRotation(q);
-    tf::Transform body_to_world = transform.inverse();
-    _tf_br.sendTransform(tf::StampedTransform(body_to_world, _laser_time, "coax", "world"));
+    //tf::Transform body_to_world = transform.inverse();
+    //_tf_br.sendTransform(tf::StampedTransform(body_to_world, _laser_time, _robot_frame, "world"));
+    _tf_br.sendTransform(tf::StampedTransform(transform, _laser_time, "world", _robot_frame));
 }
 
 void GPF::publish_pose() {
