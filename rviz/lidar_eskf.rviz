@@ -29,7 +29,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: map
+    SyncSource: dsmp_scan
 Visualization Manager:
   Class: ""
   Displays:
@@ -37,7 +37,7 @@ Visualization Manager:
       Cell Size: 0.1
       Class: rviz/Grid
       Color: 160; 160; 164
-      Enabled: false
+      Enabled: true
       Line Style:
         Line Width: 0.03
         Value: Lines
@@ -50,7 +50,7 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 100
       Reference Frame: <Fixed Frame>
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -63,7 +63,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: AxisColor
       Decay Time: 100
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -80,7 +80,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -92,7 +92,7 @@ Visualization Manager:
       Class: rviz/PointCloud2
       Color: 85; 170; 255
       Color Transformer: AxisColor
-      Decay Time: 200
+      Decay Time: 0
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
@@ -116,6 +116,9 @@ Visualization Manager:
       Class: rviz/Path
       Color: 85; 85; 255
       Enabled: true
+      Head Diameter: 0.3
+      Head Length: 0.2
+      Length: 0.3
       Line Style: Billboards
       Line Width: 0.05
       Name: ekf_path
@@ -123,6 +126,10 @@ Visualization Manager:
         X: 0
         Y: 0
         Z: 0
+      Pose Style: None
+      Radius: 0.03
+      Shaft Diameter: 0.1
+      Shaft Length: 0.1
       Topic: /lidar_eskf/path
       Unreliable: false
       Value: true
@@ -141,13 +148,13 @@ Visualization Manager:
       Update Interval: 0
       Value: false
     - Class: rviz/MarkerArray
-      Enabled: false
+      Enabled: true
       Marker Topic: /lidar_eskf/marker
       Name: particles
       Namespaces:
-        {}
+        particle_set: true
       Queue Size: 10
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -245,7 +252,7 @@ Visualization Manager:
       Axes Radius: 0.05
       Class: rviz/Pose
       Color: 255; 25; 0
-      Enabled: true
+      Enabled: false
       Head Length: 0.3
       Head Radius: 0.1
       Name: Pose
@@ -254,7 +261,7 @@ Visualization Manager:
       Shape: Axes
       Topic: /lidar_eskf/pose
       Unreliable: false
-      Value: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -279,22 +286,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/XYOrbit
-      Distance: 6.54621
+      Distance: 10.9006
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -7.43509
-        Y: 12.7637
-        Z: 2.20504e-06
+        X: -1.40819
+        Y: 0.00498557
+        Z: -1.07225e-07
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.334797
+      Pitch: 0.0202037
       Target Frame: world
       Value: XYOrbit (rviz)
-      Yaw: 1.93038
+      Yaw: 3.36538
     Saved:
       - Class: rviz/XYOrbit
         Distance: 22.1068

@@ -1,6 +1,75 @@
 #include "lidar_eskf/gpf.h"
 
+template <typename T>
+T add(T p1, T p2) {
+    T p;
+    p.x = p1.x + p2.x;
+    p.y = p1.y + p2.y;
+    p.y = p1.z + p2.z;
+    return p;
+}
+
+template <typename T>
+T minus(T p1, T p2) {
+    T p;
+    p.x = p1.x - p2.x;
+    p.y = p1.y - p2.y;
+    p.y = p1.z - p2.z;
+    return p;
+}
+
+template <typename T, typename S>
+T multiply(T p, S m) {
+    T q;
+    q.x = p.x * m;
+    q.y = p.y * m;
+    q.z = p.z * m;
+    return q;
+}
+
+template <typename T>
+double dot(T p1, T p2) {
+    return p1.x * p2.x + p1.y * p2.y + p1.z * p2.z;
+}
+
+template <typename T>
+T cross(T p1, T p2) {
+    T p;
+    p.x = p1.y*p2.z - p2.y*p1.z;
+    p.y = p2.x*p1.z - p1.x*p2.z;
+    p.z = p1.x*p2.y - p2.x*p1.y;
+    return p;
+}
+
+template <typename T>
+double norm(T p) {
+    return sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+}
+template <typename T>
+T normalize(T p) {
+
+    double n;
+    n = norm(p);
+
+    T np = multiply(p, 1/n);
+    return np;
+}
+template <typename T>
+std::vector<size_t> sort_index(const std::vector<T> v) {
+
+  // initialize original index locations
+  std::vector<size_t> idx(v.size());
+  std::iota(idx.begin(), idx.end(), 0);
+
+  // sort indexes based on comparing values in v
+  std::sort(idx.begin(), idx.end(),
+       [&v](size_t i1, size_t i2) {return v[i1] > v[i2];});
+
+  return idx;
+}
+
 GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map_ptr){
+
 
     // initialize particles pointer
     nh.param("cloud_sigma",             _ray_sigma,             1.0);
@@ -13,6 +82,7 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     nh.param("imu_to_laser_yaw",        _imu_to_laser_yaw,      0.0);
     nh.param("pcd_file",                _pcd_file,              std::string("recon.pcd"));
     nh.param("robot_frame",             _robot_frame,           std::string("/coax"));
+
     _mean_prior.setZero();
     _mean_sample.setZero();
     _mean_posterior.setZero();
@@ -26,9 +96,9 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _cov_meas.setZero();
 
     if(_laser_type.compare("pointcloud") == 0) {
-    _cloud_sub = nh.subscribe("cloud", 1, &GPF::cloud_callback, this);
+        _cloud_sub = nh.subscribe("cloud", 1, &GPF::cloud_callback, this);
     } else {
-    _scan_sub = nh.subscribe("scan", 1, &GPF::scan_callback, this);
+        _scan_sub = nh.subscribe("scan", 1, &GPF::scan_callback, this);
     }
     _cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("dsmp_cloud",1);
     _meas_pub = nh.advertise<nav_msgs::Odometry>("meas", 10);
@@ -52,12 +122,12 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _particles_ptr->set_size(_set_size);
 
     // reconstruction map initialization
-    _recmap_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
+    //_recmap_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
 }
 
 GPF::~GPF() {
-    ROS_INFO("Saving pcd file.");
-    pcl::io::savePCDFileASCII(_pcd_file, *_recmap_ptr);
+    //ROS_INFO("Saving pcd file.");
+    //pcl::io::savePCDFileASCII(_pcd_file, *_recmap_ptr);
 }
 
 void GPF::scan_callback(const sensor_msgs::LaserScan &msg) {
@@ -97,7 +167,9 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     _cloud_ptr = cloud_ptr;
 
     downsample();
+//    structure_resample();
 
+//    return;
     // transform to imu frame
     pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::transformPointCloud(*_cloud_ptr, *transformed_cloud_ptr, _imu_to_laser_transform);
@@ -140,7 +212,7 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
 //    std::cout<< "cov meas:\n" << _cov_meas.diagonal().transpose()<<std::endl;
 
     // publish needed resutls
-    //publish_pset();
+    publish_pset();
     publish_cloud();
     //publish_posterior();
     publish_path();
@@ -206,6 +278,76 @@ void GPF::downsample() {
     condRem.filter (*_cloud_ptr);
 }
 
+void GPF::structure_resample() {
+    // Remove points too close or too far
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+    for(pcl::PointCloud<pcl::PointXYZ>::iterator it = _cloud_ptr->begin(); it != _cloud_ptr->end(); it++) {
+        pcl::PointXYZ p = *it;
+        double d = sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
+        if(d <= _cloud_range && d >= 0.5) {
+            cloud.push_back(p);
+        }
+    }
+
+
+    // Compute score for all points
+    std::vector<double> score;
+    score.resize(_cloud_ptr->size(), 0.0);
+    int hfwin_size = 5;
+    for(int i=0; i<cloud.size(); i++) {
+        if(i-hfwin_size < 0 || i+hfwin_size >= cloud.size()) {
+            score[i] = 0.5;
+        } else {
+            pcl::CentroidPoint<pcl::PointXYZ> lf_c, rg_c;
+            for(int k=1; k <= hfwin_size; k++) {
+                lf_c.add(cloud[i-k]);
+                rg_c.add(cloud[i+k]);
+            }
+            pcl::PointXYZ lf_m, rg_m;
+            lf_c.get(lf_m);
+            rg_c.get(rg_m);
+            pcl::PointXYZ lf_v, rg_v;
+            lf_v = minus(lf_m, cloud[i]);
+            rg_v = minus(rg_m, cloud[i]);
+            double scr = norm(cross(lf_v, rg_v)) / (norm(lf_v) * norm(rg_v));
+            score[i] = scr;
+
+        }
+    }
+
+    // Sort the computed score
+    std::vector<size_t> idx = sort_index(score);
+
+    // Looking for 100 feature points, 400 plane points
+    pcl::PointCloud<pcl::PointXYZ> edge_cloud;
+    pcl::PointCloud<pcl::PointXYZ> plane_cloud;
+    for(int i=0; i<cloud.size(); i++) {
+        if(score[idx[i]] > 0.6) {
+            edge_cloud.push_back(cloud[idx[i]]);
+        }
+        if(edge_cloud.size() >= 50) {
+            break;
+        }
+    }
+    for(int i=0; i<cloud.size(); i++) {
+        if(score[idx[i]] < 0.2) {
+            plane_cloud.push_back(cloud[idx[i]]);
+        }
+        if(plane_cloud.size() >= 200) {
+            break;
+        }
+    }
+    cloud = edge_cloud + plane_cloud;
+//    _cloud_ptr.reset(&cloud);
+
+    sensor_msgs::PointCloud2 msg;
+    pcl::toROSMsg(cloud, msg);
+
+    msg.header.frame_id = "camera";
+    msg.header.stamp = _laser_time;
+
+    _cloud_pub.publish(msg);
+}
 void GPF::recover_meas() {
     Eigen::Matrix<double, 6, 6> K;
 

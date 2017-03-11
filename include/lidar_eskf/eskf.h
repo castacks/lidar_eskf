@@ -110,7 +110,7 @@ private:
     std::string _imu_frame, _robot_frame;
    
     // imu related
-    bool _imu_enabled, _imu_has_quat;
+    bool _imu_enabled, _imu_has_quat, _imu_transform;
     tf::TransformListener _tf_listener;
 
     // smoother

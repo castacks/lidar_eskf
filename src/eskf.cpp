@@ -40,7 +40,7 @@ ESKF::ESKF(ros::NodeHandle &nh) {
     nh.param("init_bias_acc_y",         _init_bias_acc_y,  0.0);
     nh.param("init_bias_acc_z",         _init_bias_acc_z,  0.0);
     nh.param("acc_queue_size",          _acc_queue_size,   5);
-
+    nh.param("imu_transform",           _imu_transform,    false);
     // initialize nomial states
     _velocity.setZero();
     _quaternion.setRPY(_init_roll, _init_pitch, _init_yaw);
@@ -168,39 +168,32 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
     _imu_orientation.setZ(msg.orientation.z);
     _imu_orientation.setW(msg.orientation.w);
 
-    //_imu_acceleration -= imu_rotation.transpose() * grav;
+    // If imu disabled, set acc, grav to zero
     if(!_imu_enabled) {
         _imu_acceleration.setZero();
         _gravity.setZero();
     } else {
+        // If imu has quaternion, remove gravity.
         if(_imu_has_quat) {
             tf::Matrix3x3 imu_rot(_imu_orientation);
             tf::Vector3 grav(0.0, 0.0, _g);
             _imu_acceleration += imu_rot.transpose() * grav;
             _gravity.setZero();
-        } //else {
-        //    _gravity.setValue(0.0, 0.0, _g);
-	//}
+            ROS_INFO("acc: %0.2f %0.2f %0.2f", _imu_acceleration.x(), _imu_acceleration.y(), _imu_acceleration.z());
+        }
     }
 
     // reproject imu to body frame
-    tf::StampedTransform transform;
-    try{
-        _tf_listener.lookupTransform(_robot_frame, _imu_frame, _imu_time, transform);
-        tf::Matrix3x3 R = transform.getBasis();
-        _imu_acceleration = R * _imu_acceleration;
-        _imu_angular_velocity = R * _imu_angular_velocity;
-        //if(_imu_enabled) { 
-        //    if(!_imu_has_quat) {
-	//	    _gravity.setValue(0.0, 0.0, _g);
-	//    }
-        //}
-        //ROS_INFO("ESKF: Rotation = %0.2f %0.2f %0.2f ", R[0][0],R[1][1],R[2][2]);
-    } catch (tf::TransformException ex){
-        ROS_WARN("ESKF: imu to body transform not found. ");
-        //_imu_acceleration.setZero();
-        //_imu_angular_velocity.setZero();
-        //_gravity.setZero();
+    if(_imu_transform) {
+        tf::StampedTransform transform;
+        try{
+            _tf_listener.lookupTransform(_robot_frame, _imu_frame, _imu_time, transform);
+            tf::Matrix3x3 R = transform.getBasis();
+            _imu_acceleration = R * _imu_acceleration;
+            _imu_angular_velocity = R * _imu_angular_velocity;
+        } catch (tf::TransformException ex){
+            ROS_WARN("ESKF: imu to body transform not found. ");
+        }
     }
 }
 
