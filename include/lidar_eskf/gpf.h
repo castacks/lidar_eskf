@@ -67,12 +67,10 @@ private:
     tf::TransformListener _listener;
     std::string _laser_type;
     ros::Time _laser_time;
-    std::string _pcd_file;
     std::string _robot_frame;
 
     boost::shared_ptr<DistMap>          _map_ptr;
     pcl::PointCloud<pcl::PointXYZ>::Ptr _cloud_ptr;
-    //pcl::PointCloud<pcl::PointXYZ>::Ptr _recmap_ptr;
     boost::shared_ptr<ESKF>             _eskf_ptr;
     boost::shared_ptr<Particles>        _particles_ptr;
 

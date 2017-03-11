@@ -80,7 +80,6 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     nh.param("imu_to_laser_roll",       _imu_to_laser_roll,     0.0);
     nh.param("imu_to_laser_pitch",      _imu_to_laser_pitch,    0.0);
     nh.param("imu_to_laser_yaw",        _imu_to_laser_yaw,      0.0);
-    nh.param("pcd_file",                _pcd_file,              std::string("recon.pcd"));
     nh.param("robot_frame",             _robot_frame,           std::string("/coax"));
 
     _mean_prior.setZero();
@@ -121,14 +120,9 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _particles_ptr->set_raysigma(_ray_sigma);
     _particles_ptr->set_size(_set_size);
 
-    // reconstruction map initialization
-    //_recmap_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
 }
 
-GPF::~GPF() {
-    //ROS_INFO("Saving pcd file.");
-    //pcl::io::savePCDFileASCII(_pcd_file, *_recmap_ptr);
-}
+GPF::~GPF() {}
 
 void GPF::scan_callback(const sensor_msgs::LaserScan &msg) {
     // convert laser scan to point cloud
@@ -150,7 +144,7 @@ void GPF::scan_callback(const sensor_msgs::LaserScan &msg) {
 }
 void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     _laser_time = msg.header.stamp;
-
+    ROS_INFO("GPF:cloud callback.");
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>  cloud_temp;
     pcl::fromROSMsg(msg, cloud_temp);
@@ -166,10 +160,11 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     pcl_ros::transformPointCloud(_robot_frame, cloud_temp, *cloud_ptr, _listener);
     _cloud_ptr = cloud_ptr;
 
-    downsample();
-//    structure_resample();
+    ROS_INFO("GPF: before downsample");
+//    downsample();
 
-//    return;
+    structure_resample();
+
     // transform to imu frame
     pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::transformPointCloud(*_cloud_ptr, *transformed_cloud_ptr, _imu_to_laser_transform);
@@ -213,7 +208,7 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
 
     // publish needed resutls
     publish_pset();
-    publish_cloud();
+//    publish_cloud();
     //publish_posterior();
     publish_path();
 //    publish_meas();
@@ -279,6 +274,10 @@ void GPF::downsample() {
 }
 
 void GPF::structure_resample() {
+    if(!_cloud_ptr) {
+        ROS_INFO("GPF: cloud ptr is null");
+        return;
+    }
     // Remove points too close or too far
     pcl::PointCloud<pcl::PointXYZ> cloud;
     for(pcl::PointCloud<pcl::PointXYZ>::iterator it = _cloud_ptr->begin(); it != _cloud_ptr->end(); it++) {
@@ -317,6 +316,7 @@ void GPF::structure_resample() {
 
     // Sort the computed score
     std::vector<size_t> idx = sort_index(score);
+    ROS_INFO("GPF: sorted score.");
 
     // Looking for 100 feature points, 400 plane points
     pcl::PointCloud<pcl::PointXYZ> edge_cloud;
@@ -325,7 +325,7 @@ void GPF::structure_resample() {
         if(score[idx[i]] > 0.6) {
             edge_cloud.push_back(cloud[idx[i]]);
         }
-        if(edge_cloud.size() >= 50) {
+        if(edge_cloud.size() >= 200) {
             break;
         }
     }
@@ -333,17 +333,17 @@ void GPF::structure_resample() {
         if(score[idx[i]] < 0.2) {
             plane_cloud.push_back(cloud[idx[i]]);
         }
-        if(plane_cloud.size() >= 200) {
+        if(plane_cloud.size() >= 400) {
             break;
         }
     }
     cloud = edge_cloud + plane_cloud;
-//    _cloud_ptr.reset(&cloud);
+    _cloud_ptr = cloud.makeShared();
 
     sensor_msgs::PointCloud2 msg;
     pcl::toROSMsg(cloud, msg);
 
-    msg.header.frame_id = "camera";
+    msg.header.frame_id = _robot_frame;
     msg.header.stamp = _laser_time;
 
     _cloud_pub.publish(msg);

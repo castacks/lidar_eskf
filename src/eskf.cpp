@@ -179,7 +179,6 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
             tf::Vector3 grav(0.0, 0.0, _g);
             _imu_acceleration += imu_rot.transpose() * grav;
             _gravity.setZero();
-            ROS_INFO("acc: %0.2f %0.2f %0.2f", _imu_acceleration.x(), _imu_acceleration.y(), _imu_acceleration.z());
         }
     }
 
