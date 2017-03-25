@@ -10,17 +10,23 @@
                 $(find lidar_eskf)/dat/NSH1109_circle/camera.bag"/>
                 
 	<node pkg="tf" type="static_transform_publisher" name="world_view" args="0 0 0 0 0 3.1415926 world world_view 100"/> 
-	
-	<node pkg="lidar_eskf" type="lidar_eskf_node" name="lidar_eskf" output="screen" launch-prefix="xterm -e gdb --args">
+    <node pkg="tf" type="static_transform_publisher" name="imu_camera" args="0 0 0 1.5707963 0 -1.5707963 imu camera 100"/>
+
+	<node pkg="lidar_eskf" type="lidar_eskf_node" name="lidar_eskf" output="screen" >
 	
 	    <remap from="/lidar_eskf/cloud"        to="/3d_lidar_cloud"/>
         <remap from="/imu"                     to="/imu_driver/imu"/>
 	    <remap from="/meas"                    to="/lidar_eskf/posterior"/>
-	    
+	  
+	    <param name="robot_frame"              value="imu"/>
+	    <param name="imu_frame"                value="imu"/>
+		<param name="imu_enabled"              value="true"/>
+		<param name="imu_has_quat"             value="true"/>
+		<param name="imu_transform"            value="false"/>
         <param name="map_file_name"            value="$(find lidar_eskf)/map/nsh_1109.bt"/>
         <param name="octree_resolution"        value="0.05"/>
-        <param name="max_obstacle_dist"        value="0.5"/>
-        <param name="ray_sigma"                value="1.0"/>
+        <param name="max_obstacle_dist"        value="1.0"/>
+        <param name="ray_sigma"                value="4.0"/>
         <param name="cloud_resolution"         value="0.1"/>
 		<param name="laser_type"               value="pointcloud"/>
         <param name="cloud_range"              value="20.0"/>
@@ -28,11 +34,11 @@
         <param name="pcd_file"                 value="$(find lidar_eskf)/dat/recmap_nsh_1109.pcd"/>
         
         <param name="imu_frequency"             value="200"/>
-        <param name="sigma_acceleration"        value="4.0"/>
-        <param name="sigma_gyroscop"            value="1.0"/>
-        <param name="sigma_acceleration_bias"   value="0.02"/>
-        <param name="sigma_gyroscope_bias"      value="0.01"/>
-        <param name="gravity"                   value="0.0"/>
+        <param name="sigma_acceleration"        value="2.0"/>
+        <param name="sigma_gyroscop"            value="0.5"/>
+        <param name="sigma_acceleration_bias"   value="0.002"/>
+        <param name="sigma_gyroscope_bias"      value="0.001"/>
+        <param name="gravity"                   value="9.82"/>
         
         <param name="init_bias_acc_x"           value="0.0"/> #-0.05
         <param name="init_bias_acc_y"           value="0.0"/> #0.025
@@ -40,9 +46,9 @@
         
         <param name="acc_queue_size"            value="5"/>
         
-        <param name="imu_to_laser_roll"            value="-1.5707963"/>
+        <param name="imu_to_laser_roll"            value="0.0"/>
         <param name="imu_to_laser_pitch"           value="0.0"/>
-        <param name="imu_to_laser_yaw"             value="1.5707963"/>
+        <param name="imu_to_laser_yaw"             value="0.0"/>
 
 	</node>
 	

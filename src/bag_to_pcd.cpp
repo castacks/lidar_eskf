@@ -15,6 +15,7 @@
 #include <octomap/octomap.h>
 #include <octomap/OcTree.h>
 #include <octomap/ColorOcTree.h>
+#include <pcl_ros/transforms.h>
 
 typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
 typedef pcl::PointXYZ                  PointT;
@@ -44,8 +45,8 @@ public:
     double record_time;
     double range_lim;
     double octomap_resolution;
-	bool save_pcd_true;
-	bool imu_distort;
+    bool save_pcd_true;
+    bool imu_distort;
 
     ros::Subscriber imu_sub;
     ros::Subscriber laser_sub;
@@ -66,7 +67,7 @@ BagSaver::BagSaver(ros::NodeHandle nh) {
     nh.getParam("record_time", 		record_time);
     nh.getParam("max_range", 		range_lim);
     nh.getParam("laser_type", 		laser_type);
-    nh.getParam("target_frame", 	target_frame);
+    nh.getParam("robot_frame",   	target_frame);
     nh.getParam("imu_distort",          imu_distort);
     nh.getParam("octomap_resolution",   octomap_resolution);
     nh.getParam("bt_file_name",     	bt_file_name);
@@ -108,8 +109,17 @@ void BagSaver::pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& msg)
 {
     if(stop == true) return;
 
-    PointCloud scan;
-    pcl::fromROSMsg(*msg, scan);
+    PointCloud scan, scan_temp;
+    pcl::fromROSMsg(*msg, scan_temp);
+    if(!listener.waitForTransform(
+            msg->header.frame_id,
+            target_frame,
+            ros::Time::now(),
+            ros::Duration(1.0))){
+        return;
+    }
+    
+    pcl_ros::transformPointCloud(target_frame, scan_temp, scan, listener);
     PointCloud::Ptr scan_ptr(new PointCloud(scan));
     
     // filtering
@@ -187,60 +197,6 @@ void BagSaver::laserscan_callback(const sensor_msgs::LaserScanConstPtr& msg)
     projector.transformLaserScanToPointCloud(target_frame,*msg,*scan_cloud_ptr,listener);
     
     pointcloud_callback(scan_cloud_ptr);
-    
-    /*pcl::fromROSMsg(scan_cloud, scan);
-
-    // filtering
-    PointCloud::Ptr xlim_cloud = PointCloud::Ptr (new PointCloud);
-    PointCloud::Ptr ylim_cloud = PointCloud::Ptr (new PointCloud);
-    PointCloud::Ptr zlim_cloud = PointCloud::Ptr (new PointCloud);
-    
-    pcl::PassThrough<pcl::PointXYZ> pass;
-    pass.setInputCloud(scan_ptr);
-    pass.setFilterFieldName("x");
-    pass.setFilterLimits (-range_lim, range_lim);
-    pass.filter(*xlim_cloud);
-
-    pass.setFilterFieldName("y");
-    pass.setFilterLimits (-range_lim, range_lim);
-    pass.filter(*ylim_cloud);
-
-    pass.setFilterFieldName("z");
-    pass.setFilterLimits (-range_lim, range_lim);
-    pass.filter(*zlim_cloud);
-
-    scan_ptr.reset();
-    scan_ptr = zlim_cloud;
-
-    // truncate in a bounding range
-    pcl::ConditionOr<pcl::PointXYZ>::Ptr rangeCond (new pcl::ConditionOr<pcl::PointXYZ> ());
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::LT, -0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::GT, 0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("y", pcl::ComparisonOps::LT, -0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("y", pcl::ComparisonOps::GT, 0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("x", pcl::ComparisonOps::LT, -0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("x", pcl::ComparisonOps::GT, 0.5)));
-
-    pcl::ConditionalRemoval<pcl::PointXYZ> condRem;
-    condRem.setCondition((rangeCond));
-    condRem.setInputCloud(scan_ptr);
-    condRem.setKeepOrganized(true);
-    condRem.filter (*scan_ptr);
-
-
-    // stacking scans
-    PointCloud cloud = *scan_ptr;
-    for(int i=0; i<cloud.size(); i++) {
-        std::cout << "number " << cloud.size() << std::endl;
-        pcl::PointXYZ p = cloud[i];
-        map.push_back(p);
-    }*/
 
 }
 

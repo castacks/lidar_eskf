@@ -10,9 +10,15 @@
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/common/centroid.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <laser_geometry/laser_geometry.h>
 #include <tf/transform_broadcaster.h>
+#include <pcl_ros/transforms.h>
+#include <algorithm>
+#include <numeric>
+#include <functional>
+#include <iostream>
 
 #include "lidar_eskf/eskf.h"
 #include "lidar_eskf/particles.h"
@@ -25,6 +31,7 @@ public:
     void cloud_callback(const sensor_msgs::PointCloud2 &msg);
     void scan_callback(const sensor_msgs::LaserScan &msg);
     void downsample();
+    void structure_resample();
     void recover_meas();
     void check_posdef(Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &R);
     void publish_cloud();
@@ -60,11 +67,10 @@ private:
     tf::TransformListener _listener;
     std::string _laser_type;
     ros::Time _laser_time;
-    std::string _pcd_file;
+    std::string _robot_frame;
 
     boost::shared_ptr<DistMap>          _map_ptr;
     pcl::PointCloud<pcl::PointXYZ>::Ptr _cloud_ptr;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr _recmap_ptr;
     boost::shared_ptr<ESKF>             _eskf_ptr;
     boost::shared_ptr<Particles>        _particles_ptr;
 

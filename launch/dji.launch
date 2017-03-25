@@ -10,11 +10,12 @@
 
     <node pkg="lidar_eskf" type="lidar_eskf_node" name="lidar_eskf" output="screen">
 	
-        <remap from="/lidar_eskf/cloud"        to="/sync_cloud"/>
+        <remap from="/lidar_eskf/cloud"        to="/sync_cloud_tf"/>
 	    <remap from="/lidar_eskf/scan"         to="/sync_scan"/>
         <remap from="/imu"                     to="/microstrain/imu"/>
 	    <remap from="/meas"                    to="/lidar_eskf/posterior"/>
-	    
+	
+	<param name="robot_frame"              value="/coax"/>
         <param name="map_file_name"            value="$(find lidar_eskf)/map/$(arg testName).bt"/>
         <param name="octree_resolution"        value="0.1"/>
         <param name="max_obstacle_dist"        value="2.0"/>
