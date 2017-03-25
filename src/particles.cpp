@@ -137,7 +137,7 @@ void Particles::reproject_cloud(Particle &p, pcl::PointCloud<pcl::PointXYZ> &clo
     translation << p.state[0],
                    p.state[1],
                    p.state[2];
-
+    
     rotation = Eigen::AngleAxisd(p.state[3], Eigen::Vector3d(1.0,0.0,0.0))
              * Eigen::AngleAxisd(p.state[4], Eigen::Vector3d(0.0,1.0,0.0))
              * Eigen::AngleAxisd(p.state[5], Eigen::Vector3d(0.0,0.0,1.0));
