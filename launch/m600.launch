@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
         
 <launch>
-    <arg name="testName"   default="dji_test"/>
+    <arg name="testName"   default="aria_test"/>
 
     <node pkg="lidar_eskf" type="lidar_eskf_node" name="lidar_eskf" output="screen">
         
@@ -10,10 +10,10 @@
         <remap from="/meas"                    to="/lidar_eskf/posterior"/>
     
         <param name="map_file_name"            value="$(find lidar_eskf)/map/$(arg testName).bt"/>
-        <param name="octree_resolution"        value="0.3"/>
+        <param name="octree_resolution"        value="0.2"/>
         <param name="max_obstacle_dist"        value="4.0"/>
         <param name="ray_sigma"                value="1.0"/>
-        <param name="cloud_resolution"         value="1.2"/>
+        <param name="cloud_resolution"         value="0.5"/>
         <param name="laser_type"               value="pointcloud"/>
         <param name="cloud_range"              value="50.0"/>
         <param name="set_size"                 value="500"/>
@@ -21,11 +21,11 @@
         
         <param name="robot_frame"               value="/base_frame"/>
         <param name="imu_frame"                 value="/imu"/>
-        <param name="imu_frequency"             value="50"/>
+        <param name="imu_frequency"             value="10"/>
         <param name="imu_enabled"               value="true"/>
         <param name="imu_has_quat"              value="true"/>
         <param name="imu_transform"             value="true"/>
-        <param name="sigma_acceleration"        value="2.0"/>
+        <param name="sigma_acceleration"        value="1.0"/>
         <param name="sigma_gyroscop"            value="0.1"/>
         <param name="sigma_acceleration_bias"   value="0.0002"/>
         <param name="sigma_gyroscope_bias"      value="0.0001"/>

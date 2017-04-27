@@ -5,6 +5,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/conditional_removal.h>
+#include <pcl/filters/voxel_grid.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/Imu.h>
@@ -43,7 +44,8 @@ public:
     std::string bt_file_name;
     double laser_freq;
     double record_time;
-    double range_lim;
+    double range_max;
+    double range_min;
     double octomap_resolution;
     bool save_pcd_true;
     bool imu_distort;
@@ -65,7 +67,8 @@ BagSaver::BagSaver(ros::NodeHandle nh) {
     nh.getParam("pcd_file_name", 	pcd_file);
     nh.getParam("laser_freq", 		laser_freq);
     nh.getParam("record_time", 		record_time);
-    nh.getParam("max_range", 		range_lim);
+    nh.param("max_range",               range_max, 100.0);
+    nh.param("min_range",               range_min, 0.5);
     nh.getParam("laser_type", 		laser_type);
     nh.getParam("robot_frame",   	target_frame);
     nh.getParam("imu_distort",          imu_distort);
@@ -120,7 +123,8 @@ void BagSaver::pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& msg)
     }
     
     pcl_ros::transformPointCloud(target_frame, scan_temp, scan, listener);
-    PointCloud::Ptr scan_ptr(new PointCloud(scan));
+    
+    /*PointCloud::Ptr scan_ptr(new PointCloud(scan));
     
     // filtering
     PointCloud::Ptr xlim_cloud = PointCloud::Ptr (new PointCloud);
@@ -167,14 +171,17 @@ void BagSaver::pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& msg)
     condRem.setCondition((rangeCond));
     condRem.setInputCloud(scan_ptr);
     condRem.setKeepOrganized(true);
-    condRem.filter (*scan_ptr);
+    condRem.filter (*scan_ptr);*/
 
 
     // stacking scans
-    PointCloud cloud = *scan_ptr;
-    for(int i=0; i<cloud.size(); i++) {
-        pcl::PointXYZ p = cloud[i];
-        map.push_back(p);
+    //PointCloud cloud;
+    for(int i=0; i<scan.size(); i++) {
+        pcl::PointXYZ p = scan[i];
+	double d = sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
+	if(d > range_min && d < range_max) {
+            map.push_back(p);
+	}
     }
 }
 
@@ -220,12 +227,20 @@ void BagSaver::rotate_pcd() {
     pcl::transformPointCloud(map, map_tf, T);
 }
 void BagSaver::save_pcd() {
-	if(imu_distort == true) {
-    	pcl::io::savePCDFileASCII (pcd_file, map_tf);
-	} else {
-		pcl::io::savePCDFileASCII (pcd_file, map);
-	}
+	pcl::VoxelGrid<pcl::PointXYZ> sor;
 
+	pcl::PointCloud<pcl::PointXYZ> map_downsampled;
+	
+	if(imu_distort == true) {
+	    sor.setInputCloud(map_tf.makeShared());
+    	    //pcl::io::savePCDFileASCII (pcd_file, map_tf);
+	} else {
+	    sor.setInputCloud(map.makeShared());
+	    //pcl::io::savePCDFileASCII (pcd_file, map);
+	}
+	sor.setLeafSize(0.05f, 0.05f, 0.05f);
+	sor.filter(map_downsampled);
+	pcl::io::savePCDFileASCII(pcd_file, map_downsampled);
 }
 
 void BagSaver::save_bt() {

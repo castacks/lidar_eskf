@@ -10,14 +10,14 @@
 
     <node pkg="lidar_eskf" type="lidar_eskf_node" name="lidar_eskf" output="screen">
 	
-        <remap from="/lidar_eskf/cloud"        to="/sync_cloud"/>
+        <remap from="/lidar_eskf/cloud"        to="/sync_cloud_tf"/>
 	    <remap from="/lidar_eskf/scan"         to="/sync_scan"/>
         <remap from="/imu"                     to="/microstrain/imu"/>
 	    <remap from="/meas"                    to="/lidar_eskf/posterior"/>
 	
-	
+	<param name="robot_frame"              value="/coax"/>
         <param name="map_file_name"            value="$(find lidar_eskf)/map/$(arg testName).bt"/>
-        <param name="octree_resolution"        value="0.2"/>
+        <param name="octree_resolution"        value="0.1"/>
         <param name="max_obstacle_dist"        value="2.0"/>
         <param name="ray_sigma"                value="1.0"/>
         <param name="cloud_resolution"         value="0.1"/>
@@ -25,29 +25,18 @@
         <param name="laser_type"               value="pointcloud"/>
         <param name="pcd_file"                 value="$(find lidar_eskf)/dat/rec_$(arg testName).pcd"/>
         <param name="set_size"                 value="500"/>
-        
-        <param name="robot_frame"               value="/base_frame"/>
-        <param name="imu_frame"                 value="/microstrain"/>
+
         <param name="imu_frequency"             value="50"/>
-        <param name="imu_enabled"               value="true"/>
-        <param name="imu_has_quat"              value="true"/>
-        <param name="imu_transform"             value="true"/>
         <param name="sigma_acceleration"        value="0.8"/>
         <param name="sigma_gyroscop"            value="0.1"/>
         <param name="sigma_acceleration_bias"   value="0.02"/>
         <param name="sigma_gyroscope_bias"      value="0.01"/>
-        <param name="gravity"                   value="9.8"/>
+        <param name="gravity"                   value="0.0"/>
         
         <param name="init_bias_acc_x"           value="0.0"/> #-0.05
         <param name="init_bias_acc_y"           value="0.0"/> #0.025
         <param name="init_bias_acc_z"           value="0.0"/> #-0.032
         
-        <param name="acc_queue_size"            value="1"/>
-        <param name="smooth_enabled"            value="true"/>
-        <param name="smooth_buf_size"           value="3"/>
-        <param name="smooth_type"               value="median"/>
-        <param name="init_roll"                 value="0.0"/>
-        <param name="init_pitch"                value="0.0"/>
-        <param name="init_yaw"                  value="0.0"/>
+        <param name="acc_queue_size"            value="3"/>
     </node>
 </launch>
