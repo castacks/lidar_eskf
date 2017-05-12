@@ -26,7 +26,7 @@
 
 class GPF {
 public:
-    GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr);
+    GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr, float x, float y, float z);
     ~GPF();
 
     void cloud_callback(const sensor_msgs::PointCloud2 &msg);
@@ -42,6 +42,7 @@ public:
     void publish_path();
     void publish_tf();
     void publish_pose();
+    void publish_nearest_obstacle();
     std::vector< std::vector<double> > compute_color(Particles pSet);
 
 private:
@@ -63,6 +64,7 @@ private:
     ros::Publisher  _post_pub;
     ros::Publisher  _path_pub;
     ros::Publisher  _pose_pub;
+    ros::Publisher _nearest_pub;
 
     laser_geometry::LaserProjection _projector;
     tf::TransformListener _listener;

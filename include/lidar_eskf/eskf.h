@@ -18,7 +18,7 @@
 #include <numeric>
 class ESKF {
 public:
-    ESKF(ros::NodeHandle &nh);
+    ESKF(ros::NodeHandle &nh, float x, float y, float z);
     ~ESKF();
 
     void imu_callback(const sensor_msgs::Imu &msg);

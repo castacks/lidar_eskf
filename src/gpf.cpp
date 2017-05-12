@@ -68,7 +68,7 @@ std::vector<size_t> sort_index(const std::vector<T> v) {
   return idx;
 }
 
-GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map_ptr){
+GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr, float x, float y, float z) : _map_ptr(map_ptr){
 
 
     // initialize particles pointer
@@ -83,6 +83,10 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     nh.param("robot_frame",             _robot_frame,           std::string("/coax"));
 
     _mean_prior.setZero();
+    _mean_prior[0] = x;
+    _mean_prior[1] = y;
+    _mean_prior[2] = z;
+    std::cout << _mean_prior << std::endl;
     _mean_sample.setZero();
     _mean_posterior.setZero();
     _mean_meas.setZero();
@@ -106,6 +110,7 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _path_pub = nh.advertise<nav_msgs::Path>("path", 1);
     _pose_pub = nh.advertise<geometry_msgs::PoseStamped>("pose", 10);
 
+
     _imu_to_laser_rotation.setRPY(_imu_to_laser_roll, _imu_to_laser_pitch, _imu_to_laser_yaw);
 
     _imu_to_laser_transform << _imu_to_laser_rotation[0][0], _imu_to_laser_rotation[0][1], _imu_to_laser_rotation[0][2], 0,
@@ -113,7 +118,7 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
                                _imu_to_laser_rotation[2][0], _imu_to_laser_rotation[2][1], _imu_to_laser_rotation[2][2], 0,
                                                           0,                            0,                            0, 1;
     // initialize eskf
-    _eskf_ptr = boost::shared_ptr<ESKF> (new ESKF(nh));
+    _eskf_ptr = boost::shared_ptr<ESKF> (new ESKF(nh,x,y,z));
 
     // initialize particle
     _particles_ptr = boost::shared_ptr<Particles> (new Particles(map_ptr));

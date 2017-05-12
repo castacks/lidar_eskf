@@ -149,6 +149,7 @@ public:
     double get_dist(octomap::point3d p);
     char get_gridmask(octomap::point3d p);
 
+    void get_closest_obstacle(octomap::point3d p, float &distance, octomap::point3d& closestObstacle);
 
 private:
 

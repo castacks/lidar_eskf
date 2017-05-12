@@ -8,7 +8,7 @@ int main(int argc, char **argv) {
 
     boost::shared_ptr<DistMap> map_ptr = boost::shared_ptr<DistMap>(new DistMap(n));
     sleep(1);
-    boost::shared_ptr<GPF> gpf_ptr = boost::shared_ptr<GPF>(new GPF(n, map_ptr));
+    boost::shared_ptr<GPF> gpf_ptr = boost::shared_ptr<GPF>(new GPF(n, map_ptr,0,0,0));
     ros::spin();
     return 0;
 

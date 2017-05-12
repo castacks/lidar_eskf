@@ -50,7 +50,7 @@ endif()
 
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES 
+  LIBRARIES map
   CATKIN_DEPENDS tf
   DEPENDS octomap
 )
@@ -85,6 +85,8 @@ target_link_libraries(bag_to_pcd ${PCL_LIBRARY_DIRS} ${catkin_LIBRARIES} ${OCTOM
 add_executable(lidar_eskf_node src/lidar_eskf_node.cpp)
 target_link_libraries(lidar_eskf_node eskf map gpf particles ${catkin_LIBRARIES} ${OCTOMAP_LIBRARIES} )
 
+add_executable(lidar_eskf_with_reset_node src/lidar_eskf_with_reset_node.cpp)
+target_link_libraries(lidar_eskf_with_reset_node eskf map gpf particles ${catkin_LIBRARIES} ${OCTOMAP_LIBRARIES} )
 
 add_executable(localization_evaluation src/localization_evaluation.cpp)
 target_link_libraries(localization_evaluation ${catkin_LIBRARIES})

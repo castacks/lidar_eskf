@@ -15,7 +15,7 @@ inline tf::Matrix3x3 skew(tf::Vector3 w) {
     return R;
 }
 
-ESKF::ESKF(ros::NodeHandle &nh) {
+ESKF::ESKF(ros::NodeHandle &nh, float x, float y, float z) {
 
     
     nh.param("imu_frequency",           _imu_freq,         50.0);
@@ -46,7 +46,8 @@ ESKF::ESKF(ros::NodeHandle &nh) {
     _quaternion.setRPY(_init_roll, _init_pitch, _init_yaw);
     _rotation.setRotation(_quaternion);
     
-    _position.setZero();
+    _position.setValue(x,y,z);
+    
     _bias_acc.setValue(_init_bias_acc_x, _init_bias_acc_y, _init_bias_acc_z);
     _bias_gyr.setZero();
 

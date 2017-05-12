@@ -2,16 +2,18 @@
 
 DistMap::DistMap(ros::NodeHandle &nh) {
 
-    nh.param("map_file_name", _map_file_name, std::string("nsh_1109.bt"));
+    nh.param("map_file_name", _map_file_name, std::string("/home/slz/inspection_ws/src/lidar_eskf/map/bridge.bt"));
     nh.param("octree_resolution", _octree_resolution, 0.05);
-    nh.param("max_obstacle_dist", _max_obstacle_dist, 0.5);
+    nh.param("max_obstacle_dist", _max_obstacle_dist, 10.0);
+    std::cout << _max_obstacle_dist << std::endl;
     read_mapfile();
     usleep(100);
 }
 
 void DistMap::read_mapfile() {
-    std::fstream mapFile(_map_file_name.c_str(), std::ios_base::binary | std::ios_base::in);
-
+    // std::fstream mapFile(_map_file_name.c_str(), std::ios_base::binary | std::ios_base::in);
+    std::fstream mapFile("/home/slz/inspection_ws/src/lidar_eskf/map/bridge.bt", std::ios_base::binary | std::ios_base::in);
+    // std::cout << _map_file_name.c_str() << std::endl;
     if (mapFile.is_open()) {
         ROS_INFO("DistMap: loading binary map.");
         _map_ptr = boost::shared_ptr<octomap::OcTree> (new octomap::OcTree (_octree_resolution));
@@ -85,4 +87,7 @@ double DistMap::get_dist(octomap::point3d p) {
 }
 char DistMap::get_gridmask(octomap::point3d p) {
     return _dist_map_ptr->getGridMask(p);
+}
+void DistMap::get_closest_obstacle(octomap::point3d p, float &distance, octomap::point3d& closestObstacle){
+    _dist_map_ptr->getDistanceAndClosestObstacle(p, distance, closestObstacle);
 }
