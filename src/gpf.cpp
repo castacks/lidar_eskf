@@ -591,7 +591,7 @@ void GPF::publish_path() {
     msg.pose.orientation.w = q.w();
     
     _pose_deque.push_back(msg);
-    if(_pose_deque.size() > 400) {
+    if(_pose_deque.size() > 200) {
 	    _pose_deque.pop_front();
     }
 
@@ -614,7 +614,7 @@ void GPF::publish_tf() {
     transform.setRotation(q);
     //tf::Transform body_to_world = transform.inverse();
     //_tf_br.sendTransform(tf::StampedTransform(body_to_world, _laser_time, _robot_frame, "world"));
-    _tf_br.sendTransform(tf::StampedTransform(transform, _laser_time, "world", _robot_frame));
+    _tf_br.sendTransform(tf::StampedTransform(transform, _laser_time, "world", "robot"));
 }
 
 void GPF::publish_pose() {

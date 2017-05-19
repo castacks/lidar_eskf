@@ -123,59 +123,8 @@ void BagSaver::pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& msg)
     }
     
     pcl_ros::transformPointCloud(target_frame, scan_temp, scan, listener);
-    
-    /*PointCloud::Ptr scan_ptr(new PointCloud(scan));
-    
-    // filtering
-    PointCloud::Ptr xlim_cloud = PointCloud::Ptr (new PointCloud);
-    PointCloud::Ptr ylim_cloud = PointCloud::Ptr (new PointCloud);
-    PointCloud::Ptr zlim_cloud = PointCloud::Ptr (new PointCloud);
-    
-    pcl::PassThrough<pcl::PointXYZ> pass_x;
-    pass_x.setInputCloud(scan_ptr);
-    pass_x.setFilterFieldName("x");
-    pass_x.setFilterLimits (-range_lim, range_lim);
-    pass_x.filter(*xlim_cloud);
-
-    pcl::PassThrough<pcl::PointXYZ> pass_y;
-    pass_y.setInputCloud(xlim_cloud);
-    pass_y.setFilterFieldName("y");
-    pass_y.setFilterLimits (-range_lim, range_lim);
-    pass_y.filter(*ylim_cloud);
-
-    pcl::PassThrough<pcl::PointXYZ> pass_z;
-    pass_z.setInputCloud(ylim_cloud);
-    pass_z.setFilterFieldName("z");
-    pass_z.setFilterLimits (-range_lim, range_lim);
-    pass_z.filter(*zlim_cloud);
-
-    scan_ptr.reset();
-    scan_ptr = zlim_cloud;
-
-    // truncate in a bounding range
-    pcl::ConditionOr<pcl::PointXYZ>::Ptr rangeCond (new pcl::ConditionOr<pcl::PointXYZ> ());
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::LT, -0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::GT, 0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("y", pcl::ComparisonOps::LT, -0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("y", pcl::ComparisonOps::GT, 0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("x", pcl::ComparisonOps::LT, -0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("x", pcl::ComparisonOps::GT, 0.5)));
-
-    pcl::ConditionalRemoval<pcl::PointXYZ> condRem;
-    condRem.setCondition((rangeCond));
-    condRem.setInputCloud(scan_ptr);
-    condRem.setKeepOrganized(true);
-    condRem.filter (*scan_ptr);*/
-
 
     // stacking scans
-    //PointCloud cloud;
     for(int i=0; i<scan.size(); i++) {
         pcl::PointXYZ p = scan[i];
 	double d = sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
@@ -283,6 +232,7 @@ int  main (int argc, char** argv)
      ros::NodeHandle n("bag_to_pcd");
 
      BagSaver saver(n);
+	 sleep(1.0);
 
      double tic = ros::Time::now().toSec();
      double toc = ros::Time::now().toSec();

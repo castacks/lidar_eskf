@@ -1,20 +1,21 @@
 <?xml version="1.0"?>
 <launch>
-        <arg name="testName" default="aria_test"/>
+        <arg name="testName" default="tunnel"/>
 
 	<node pkg="lidar_eskf" type="bag_to_pcd" name="bag_to_pcd" output="screen" required="true">
-		<param name="imu_topic"                 value="/microstrain/imu"/>
-		<param name="laser_topic"               value="/velodyne_points"/>
+		<param name="imu_topic"                 value="/dji_sim/imu"/>
+		<param name="laser_topic"               value="/dji_sim/laser/pointcloud"/>
 		<!-- <param name="laser_type"                value="laserscan"/> -->
 		<param name="laser_type"               value="pointcloud"/>
-		<param name="laser_freq"                value="40"/>
-		<param name="record_time"               value="5"/>
-		<param name="max_range"                 value="50"/>  
-		<param name="robot_frame"              value="/coax"/>
+		<param name="laser_freq"                value="33"/>
+		<param name="record_time"               value="30"/>
+		<param name="max_range"                 value="30"/>
+		<param name="min_range"                 value="0.5"/>
+		<param name="robot_frame"               value="/base_link"/>
 		<param name="bt_file_name"              value="$(find lidar_eskf)/map/$(arg testName).bt"/>
-		<param name="octomap_resolution"        value="0.2"/>
+		<param name="octomap_resolution"        value="0.1"/>
 		<param name="imu_distort"               value="false"/>
-		<param name="save_pcd_true"             value="false"/>
+		<param name="save_pcd_true"             value="true"/>
 		<param name="pcd_file_name"             value="$(find lidar_eskf)/map/$(arg testName).pcd"/>
 	</node>
 

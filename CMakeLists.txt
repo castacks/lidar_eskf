@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf_conversions
   pcl_conversions
   pcl_ros
+  octomap_ros
   laser_geometry
   dynamicEDT3D
 )
@@ -52,7 +53,7 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES 
   CATKIN_DEPENDS tf
-  DEPENDS octomap
+  DEPENDS octomap dynamicEDT3D
 )
 
 include_directories(
@@ -61,8 +62,8 @@ include_directories(
   ${Eigen_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
   ${OCTOMAP_INCLUDE_DIRS}
+  ${DYNAMICEDT3D_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
-  ${dynamicEDT3D_INCLUDE_DIRS}
 )
 
 ## Declare C++ library
@@ -71,7 +72,7 @@ target_link_libraries(eskf ${catkin_LIBRARIES})
 add_library(particles src/particles.cpp)
 target_link_libraries(particles ${catkin_LIBRARIES})
 add_library(map src/map.cpp)
-target_link_libraries(map ${catkin_LIBRARIES})
+target_link_libraries(map ${catkin_LIBRARIES} ${DYNAMICEDT3D_LIBRARIES})
 add_library(gpf src/gpf.cpp)
 target_link_libraries(gpf eskf particles ${catkin_LIBRARIES})
 
@@ -84,7 +85,6 @@ target_link_libraries(bag_to_pcd ${PCL_LIBRARY_DIRS} ${catkin_LIBRARIES} ${OCTOM
 
 add_executable(lidar_eskf_node src/lidar_eskf_node.cpp)
 target_link_libraries(lidar_eskf_node eskf map gpf particles ${catkin_LIBRARIES} ${OCTOMAP_LIBRARIES} )
-
 
 add_executable(localization_evaluation src/localization_evaluation.cpp)
 target_link_libraries(localization_evaluation ${catkin_LIBRARIES})

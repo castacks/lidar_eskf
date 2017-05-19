@@ -5,8 +5,13 @@
 #include <dynamicEDT3D/dynamicEDTOctomap.h>
 #include "pcl_ros/point_cloud.h"
 #include "pcl/point_types.h"
+#include <octomap/OcTree.h>
+#include <octomap_ros/conversions.h>
+#include <octomap_msgs/Octomap.h>
+#include <octomap_msgs/conversions.h>
+#include <tf/transform_listener.h>
 
-class MapModel: public DynamicEDTOctomap
+/*class MapModel: public DynamicEDTOctomap
 {
 public:
     MapModel(float max_dist,
@@ -24,8 +29,9 @@ public:
     virtual ~MapModel() {
         _octree = NULL;
     }
-    virtual void update(bool updateRealDist=true) {
+    virtual void update(bool updateRealDist=true, bool updateGridMask=true) {
         DynamicEDTOctomap::update(updateRealDist);
+        ROS_INFO("Update DistMap.");
         update_gridmask();
     }
     void update_gridmask() {
@@ -98,7 +104,7 @@ protected:
     int _size_z;
 
     std::vector<std::vector<std::vector<char> > > _gridMask;
-};
+};*/
 
 
 class DistMap
@@ -129,8 +135,8 @@ public:
     /**
        * \brief Return distance map pointer
     */
-    boost::shared_ptr<MapModel> get_dist_map() const;
-
+//    boost::shared_ptr<MapModel> get_dist_map() const;
+    boost::shared_ptr<DynamicEDTOctomap> get_dist_map() const;
     /**
        * \brief Convert octomap to distance map
     */
@@ -150,6 +156,7 @@ public:
     char get_gridmask(octomap::point3d p);
 
 
+    void cloud_callback(const sensor_msgs::PointCloud2 &msg);
 private:
 
     // File name of the binary octomap (*.bt)
@@ -159,9 +166,20 @@ private:
 
     // Octomap pointer
     boost::shared_ptr<octomap::OcTree> _map_ptr;
+//    boost::shared_ptr<octomap::OcTree> _map_dup_ptr;
 
     // Distance map pointer
-    boost::shared_ptr<MapModel> _dist_map_ptr;
+//    boost::shared_ptr<MapModel> _dist_map_ptr;
+    boost::shared_ptr<DynamicEDTOctomap> _dist_map_ptr;
+
+    // Octomap Subscriber
+    ros::Subscriber _cloud_sub;
+
+    // TF listener
+    tf::TransformListener _listener;
+
+    // Map Publisher
+    ros::Publisher _octomap_pub;
 
 };
 
