@@ -76,10 +76,6 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     nh.param("cloud_resolution",        _cloud_resol,           0.2);
     nh.param("set_size",                _set_size,              500);
     nh.param("cloud_range",             _cloud_range,           20.0);
-    nh.param("laser_type",              _laser_type,            std::string("pointcloud"));
-    nh.param("imu_to_laser_roll",       _imu_to_laser_roll,     0.0);
-    nh.param("imu_to_laser_pitch",      _imu_to_laser_pitch,    0.0);
-    nh.param("imu_to_laser_yaw",        _imu_to_laser_yaw,      0.0);
     nh.param("robot_frame",             _robot_frame,           std::string("/coax"));
 
     _mean_prior.setZero();
@@ -94,11 +90,10 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _cov_posterior.setZero();
     _cov_meas.setZero();
 
-    if(_laser_type.compare("pointcloud") == 0) {
-        _cloud_sub = nh.subscribe("cloud", 1, &GPF::cloud_callback, this);
-    } else {
-        _scan_sub = nh.subscribe("scan", 1, &GPF::scan_callback, this);
-    }
+    _cloud_sub = nh.subscribe("cloud", 1, &GPF::cloud_callback, this);
+    _scan_sub  = nh.subscribe("scan", 1, &GPF::scan_callback, this);
+    _pozyx_sub = nh.subscribe("/pozyx_pose_cov", 1, &GPF::pozyx_callback, this);
+
     _cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("dsmp_cloud",1);
     _meas_pub = nh.advertise<nav_msgs::Odometry>("meas", 10);
     _pset_pub = nh.advertise<visualization_msgs::MarkerArray>("marker", 1);
@@ -106,12 +101,6 @@ GPF::GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr) : _map_ptr(map
     _path_pub = nh.advertise<nav_msgs::Path>("path", 1);
     _pose_pub = nh.advertise<geometry_msgs::PoseStamped>("pose", 10);
 
-    _imu_to_laser_rotation.setRPY(_imu_to_laser_roll, _imu_to_laser_pitch, _imu_to_laser_yaw);
-
-    _imu_to_laser_transform << _imu_to_laser_rotation[0][0], _imu_to_laser_rotation[0][1], _imu_to_laser_rotation[0][2], 0,
-                               _imu_to_laser_rotation[1][0], _imu_to_laser_rotation[1][1], _imu_to_laser_rotation[1][2], 0,
-                               _imu_to_laser_rotation[2][0], _imu_to_laser_rotation[2][1], _imu_to_laser_rotation[2][2], 0,
-                                                          0,                            0,                            0, 1;
     // initialize eskf
     _eskf_ptr = boost::shared_ptr<ESKF> (new ESKF(nh));
 
@@ -144,7 +133,6 @@ void GPF::scan_callback(const sensor_msgs::LaserScan &msg) {
 }
 void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     _laser_time = msg.header.stamp;
-    //ROS_INFO("GPF:cloud callback.");
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>  cloud_temp;
     pcl::fromROSMsg(msg, cloud_temp);
@@ -160,15 +148,7 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     pcl_ros::transformPointCloud(_robot_frame, cloud_temp, *cloud_ptr, _listener);
     _cloud_ptr = cloud_ptr;
 
-    //ROS_INFO("GPF: before downsample");
     downsample();
-
-    //structure_resample();
-
-    // transform to imu frame
-    pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud_ptr = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::transformPointCloud(*_cloud_ptr, *transformed_cloud_ptr, _imu_to_laser_transform);
-    _cloud_ptr = transformed_cloud_ptr;
 
     // request prior from eskf
     _eskf_ptr->get_mean_pose(_mean_prior);
@@ -209,19 +189,71 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     // publish needed resutls
     publish_pset();
     publish_cloud();
-    //publish_posterior();
+    publish_posterior();
     publish_path();
-//    publish_meas();
+    publish_meas();
     publish_tf();
     //publish_pose();
 
 }
 
+void GPF::pozyx_callback(const geometry_msgs::PoseWithCovariance &msg) {
+
+    // request prior from eskf
+    _eskf_ptr->get_mean_pose(_mean_prior);
+    _eskf_ptr->get_cov_pose(_cov_prior);
+
+    // find previous transform
+    Eigen::Quaterniond rotation_prev(_mean_prior[3], _mean_prior[4], _mean_prior[5], _mean_prior[6]);
+    Eigen::Vector3d translation_prev(_mean_prior[0], _mean_prior[1], _mean_prior[2]);
+
+    // find the pozyx measured transform
+    Eigen::Quaterniond rotation_curr(msg.pose.orientation.w, msg.pose.orientation.x,
+                                  msg.pose.orientation.y, msg.pose.orientation.z);
+    Eigen::Vector3d translation_curr(msg.pose.position.x, msg.pose.position.y, msg.pose.position.z);
+
+    // find the error transform: T_prev.inv() * T_curr
+    Eigen::Quaterniond rotation_err;
+    Eigen::Vector3d translation_err;
+    rotation_err = rotation_prev.inverse() * rotation_curr;
+    translation_err = rotation_prev.inverse() * (translation_curr - translation_prev);
+
+    // convert to error twist
+    Eigen::AngleAxisd err_angle_axis(rotation_err);
+    Eigen::Vector3d twist = err_angle_axis.angle() * err_angle_axis.axis();
+
+    _mean_meas[0] = translation_err[0];
+    _mean_meas[1] = translation_err[1];
+    _mean_meas[2] = translation_err[2];
+    _mean_meas[3] = twist[0];
+    _mean_meas[4] = twist[1];
+    _mean_meas[5] = twist[2];
+
+    // find the diagonal elements of pozyx pose
+    Eigen::Matrix<double, 6, 1> pozyx_pose_sigma;
+    pozyx_pose_sigma << msg.covariance[0],
+                     msg.covariance[7],
+                     msg.covariance[14],
+                     msg.covariance[21],
+                     msg.covariance[28],
+                     msg.covariance[35];
+
+    // transform covariance from world to body
+    Eigen::Matrix3d Z = Eigen::Matrix3d::Zero();
+    Eigen::Matrix<double, 6, 6> R;
+    R << rotation_prev.toRotationMatrix(), Z,
+         Z, rotation_prev.toRotationMatrix();
+    _cov_meas = R * pozyx_pose_sigma.asDiagonal() * R.transpose();
+
+    // update eskf
+    _eskf_ptr->update_meas_mean(_mean_meas);
+    _eskf_ptr->update_meas_cov(_cov_meas);
+    _eskf_ptr->update_meas_flag();
+
+}
+
 void GPF::downsample() {
     pcl::PointCloud<pcl::PointXYZ>::Ptr unif_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
-    /*pcl::PointCloud<pcl::PointXYZ>::Ptr xlim_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr ylim_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr zlim_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);*/
 
     // down sampling
     pcl::PointCloud<int> sampled_indices;
@@ -230,47 +262,6 @@ void GPF::downsample() {
     uniform_sampling.setRadiusSearch(_cloud_resol);
     uniform_sampling.compute(sampled_indices);
     pcl::copyPointCloud (*_cloud_ptr, sampled_indices.points, *unif_cloud);
-
-    // truncating in range
-    /*pcl::PassThrough<pcl::PointXYZ> pass;
-    pass.setInputCloud(unif_cloud);
-    pass.setFilterFieldName("x");
-    pass.setFilterLimits (-_cloud_range, _cloud_range);
-    pass.filter(*xlim_cloud);
-
-    pass.setInputCloud(xlim_cloud);
-    pass.setFilterFieldName("y");
-    pass.setFilterLimits (-_cloud_range, _cloud_range);
-    pass.filter(*ylim_cloud);
-
-    pass.setInputCloud(ylim_cloud);
-    pass.setFilterFieldName("z");
-    pass.setFilterLimits (-_cloud_range, _cloud_range);
-    pass.filter(*zlim_cloud);
-
-    _cloud_ptr.reset();
-    _cloud_ptr = zlim_cloud;
-
-    // truncate in a bounding range
-    pcl::ConditionOr<pcl::PointXYZ>::Ptr rangeCond (new pcl::ConditionOr<pcl::PointXYZ> ());
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::LT, -0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::GT, 0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("y", pcl::ComparisonOps::LT, -0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("y", pcl::ComparisonOps::GT, 0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("x", pcl::ComparisonOps::LT, -0.5)));
-    rangeCond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new
-          pcl::FieldComparison<pcl::PointXYZ> ("x", pcl::ComparisonOps::GT, 0.5)));
-
-    pcl::ConditionalRemoval<pcl::PointXYZ> condRem;
-    condRem.setCondition((rangeCond));
-    condRem.setInputCloud(_cloud_ptr);
-    condRem.setKeepOrganized(true);
-    condRem.filter (*_cloud_ptr);*/
 
     _cloud_ptr->clear();
     for(pcl::PointCloud<pcl::PointXYZ>::iterator it = unif_cloud->begin();
@@ -286,90 +277,6 @@ void GPF::downsample() {
     ROS_INFO_STREAM_THROTTLE(1.0, "GPF: Cloud size " << int(_cloud_ptr->size()));
 }
 
-void GPF::structure_resample() {
-    if(!_cloud_ptr) {
-        ROS_WARN("GPF: cloud ptr is null");
-        return;
-    }
-    // Remove points too close or too far
-    pcl::PointCloud<pcl::PointXYZ> cloud;
-    for(pcl::PointCloud<pcl::PointXYZ>::iterator it = _cloud_ptr->begin(); it != _cloud_ptr->end(); it++) {
-        pcl::PointXYZ p = *it;
-        double d = sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
-        if(d <= _cloud_range && d >= 0.8) {
-            cloud.push_back(p);
-        }
-    }
-
-
-    // Compute score for all points
-    std::vector<double> score;
-    score.resize(_cloud_ptr->size(), 0.0);
-    int hfwin_size = 5;
-    for(int i=0; i<cloud.size(); i++) {
-        if(i-hfwin_size < 0 || i+hfwin_size >= cloud.size()) {
-            score[i] = 0.5;
-        } else {
-            /*pcl::CentroidPoint<pcl::PointXYZ> lf_c, rg_c;
-            for(int k=1; k <= hfwin_size; k++) {
-                lf_c.add(cloud[i-k]);
-                rg_c.add(cloud[i+k]);
-            }
-            pcl::PointXYZ lf_m, rg_m;
-            lf_c.get(lf_m);
-            rg_c.get(rg_m);*/
-            pcl::PointXYZ lf_c, rg_c;
-	    lf_c.x = 0.0; lf_c.y = 0.0; lf_c.z = 0.0; 
-	    rg_c.x = 0.0; rg_c.y = 0.0; rg_c.z = 0.0;
-	    for(int k=1; k<= hfwin_size; k++) {
-	        lf_c = add(lf_c, cloud[i-k]);
-		rg_c = add(rg_c, cloud[i+k]);
-	    }
-	    pcl::PointXYZ lf_m = multiply(lf_c, 1.0/hfwin_size);
-	    pcl::PointXYZ rg_m = multiply(rg_c, 1.0/hfwin_size);
-            pcl::PointXYZ lf_v, rg_v;
-            lf_v = minus(lf_m, cloud[i]);
-            rg_v = minus(rg_m, cloud[i]);
-            double scr = norm(cross(lf_v, rg_v)) / (norm(lf_v) * norm(rg_v));
-            score[i] = scr;
-
-        }
-    }
-
-    // Sort the computed score
-    std::vector<size_t> idx = sort_index(score);
-    //ROS_INFO("GPF: sorted score.");
-
-    // Looking for 100 feature points, 400 plane points
-    pcl::PointCloud<pcl::PointXYZ> edge_cloud;
-    pcl::PointCloud<pcl::PointXYZ> plane_cloud;
-    for(int i=0; i<cloud.size(); i++) {
-        if(score[idx[i]] > 0.2) {
-            edge_cloud.push_back(cloud[idx[i]]);
-        }
-        if(edge_cloud.size() >= 600) {
-            break;
-        }
-    }
-    for(int i=0; i<cloud.size(); i++) {
-        if(score[idx[i]] < 0.2) {
-            plane_cloud.push_back(cloud[idx[i]]);
-        }
-        if(plane_cloud.size() >= 200) {
-            break;
-        }
-    }
-    cloud = edge_cloud + plane_cloud;
-    _cloud_ptr = cloud.makeShared();
-
-    sensor_msgs::PointCloud2 msg;
-    pcl::toROSMsg(cloud, msg);
-
-    msg.header.frame_id = _robot_frame;
-    msg.header.stamp = _laser_time;
-
-    _cloud_pub.publish(msg);
-}
 void GPF::recover_meas() {
     Eigen::Matrix<double, 6, 6> K;
 
@@ -377,9 +284,6 @@ void GPF::recover_meas() {
     check_posdef(_cov_meas);
     K = _cov_sample * ( _cov_sample + _cov_meas).inverse();
     _mean_meas = K.inverse() * (_mean_posterior - _mean_sample) + _mean_sample;
-
-//    std::cout << "K:" << K << std::endl;
-
 }
 
 void GPF::check_posdef(Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &R) {
@@ -440,12 +344,6 @@ void GPF::publish_pset() {
 
     for(int i=0; i<_set_size; i++) {
 
-        tf::Vector3 position;
-        tf::Quaternion quaternion;
-
-        position.setValue(pset[i].state[0], pset[i].state[1], pset[i].state[2]);
-        quaternion.setRPY(pset[i].state[3], pset[i].state[4], pset[i].state[5]);
-
         visualization_msgs::Marker m;
         m.header.frame_id = "world";
         m.header.stamp = _laser_time;
@@ -453,13 +351,13 @@ void GPF::publish_pset() {
         m.id = i;
         m.type = visualization_msgs::Marker::ARROW;
         m.action = visualization_msgs::Marker::ADD;
-        m.pose.position.x = position.x();
-        m.pose.position.y = position.y();
-        m.pose.position.z = position.z();
-        m.pose.orientation.x = quaternion.x();
-        m.pose.orientation.y = quaternion.y();
-        m.pose.orientation.z = quaternion.z();
-        m.pose.orientation.w = quaternion.w();
+        m.pose.position.x = pset[i].translation.x();
+        m.pose.position.y = pset[i].translation.y();
+        m.pose.position.z = pset[i].translation.z();
+        m.pose.orientation.w = pset[i].rotation.w();
+        m.pose.orientation.x = pset[i].rotation.x();
+        m.pose.orientation.y = pset[i].rotation.y();
+        m.pose.orientation.z = pset[i].rotation.z();
         m.scale.x = 0.1;
         m.scale.y = 0.01;
         m.scale.z = 0.01;
@@ -517,29 +415,11 @@ std::vector< std::vector<double> > GPF::compute_color(Particles pSet) {
 
 void GPF::publish_cloud() {
     pcl::PointCloud<pcl::PointXYZ> cloud;
-    Eigen::Matrix4d transform;
-    //Eigen::Matrix3d rotation;
-    //Eigen::Vector3d translation;
-
-    //translation << _mean_prior[0], _mean_prior[1], _mean_prior[2];
-
-    //rotation = Eigen::AngleAxisd(_mean_prior[3], Eigen::Vector3d(1.0,0.0,0.0))
-    //         * Eigen::AngleAxisd(_mean_prior[4], Eigen::Vector3d(0.0,1.0,0.0))
-    //         * Eigen::AngleAxisd(_mean_prior[5], Eigen::Vector3d(0.0,0.0,1.0));
-
-    tf::Matrix3x3 rotation;
-    rotation.setRPY(_mean_prior[3], _mean_prior[4], _mean_prior[5]);
-   
-    transform << rotation[0][0],rotation[0][1],rotation[0][2], _mean_prior[0],
-                 rotation[1][0],rotation[1][1],rotation[1][2], _mean_prior[1],
-                 rotation[2][0],rotation[2][1],rotation[2][2], _mean_prior[2],
-                 0, 0, 0, 1;
-
-    pcl::transformPointCloud(*_cloud_ptr, cloud, transform);
-
-    // stack into reconstructed map
-    //*_recmap_ptr += cloud;
-//    ROS_INFO("gpf: reconstructed map size %d\n", int(_recmap_ptr->size()));
+    pcl::transformPointCloud(*_cloud_ptr,
+                             cloud,
+                             Eigen::Vector3d(_mean_prior[0], _mean_prior[1], _mean_prior[2]),
+                             Eigen::Quaterniond(_mean_prior[3], _mean_prior[4],
+                                                _mean_prior[5], _mean_prior[6]));
 
     // publish scan
     sensor_msgs::PointCloud2 msg;
@@ -582,16 +462,13 @@ void GPF::publish_path() {
     msg.pose.position.x = _mean_prior[0];
     msg.pose.position.y = _mean_prior[1];
     msg.pose.position.z = _mean_prior[2];
-
-    tf::Quaternion q;
-    q.setRPY(_mean_prior[3], _mean_prior[4], _mean_prior[5]);
-    msg.pose.orientation.x = q.x();
-    msg.pose.orientation.y = q.y();
-    msg.pose.orientation.z = q.z();
-    msg.pose.orientation.w = q.w();
+    msg.pose.orientation.w = _mean_prior[3];
+    msg.pose.orientation.x = _mean_prior[4];
+    msg.pose.orientation.y = _mean_prior[5];
+    msg.pose.orientation.z = _mean_prior[6];
     
     _pose_deque.push_back(msg);
-    if(_pose_deque.size() > 200) {
+    if(_pose_deque.size() > 400) {
 	    _pose_deque.pop_front();
     }
 
@@ -606,15 +483,10 @@ void GPF::publish_path() {
 }
 
 void GPF::publish_tf() {
-    //ROS_INFO("GPF: Publishing tf.");
     tf::Transform transform;
-    transform.setOrigin( tf::Vector3(_mean_prior[0], _mean_prior[1], _mean_prior[2]));
-    tf::Quaternion q;
-    q.setRPY(_mean_prior[3], _mean_prior[4], _mean_prior[5]);
-    transform.setRotation(q);
-    //tf::Transform body_to_world = transform.inverse();
-    //_tf_br.sendTransform(tf::StampedTransform(body_to_world, _laser_time, _robot_frame, "world"));
-    _tf_br.sendTransform(tf::StampedTransform(transform, _laser_time, "world", "robot"));
+    transform.setOrigin(tf::Vector3(_mean_prior[0], _mean_prior[1], _mean_prior[2]));
+    transform.setRotation(tf::Quaternion(_mean_prior[4], _mean_prior[5], _mean_prior[6], _mean_prior[3]));
+    _tf_br.sendTransform(tf::StampedTransform(transform, _laser_time, "world", _robot_frame));
 }
 
 void GPF::publish_pose() {
@@ -626,13 +498,10 @@ void GPF::publish_pose() {
     msg.pose.position.x = _mean_prior[0];
     msg.pose.position.y = _mean_prior[1];
     msg.pose.position.z = _mean_prior[2];
-
-    tf::Quaternion q;
-    q.setRPY(_mean_prior[3], _mean_prior[4], _mean_prior[5] + M_PI);
-    msg.pose.orientation.w = q.w();
-    msg.pose.orientation.x = q.x();
-    msg.pose.orientation.y = q.y();
-    msg.pose.orientation.z = q.z();
+    msg.pose.orientation.w = _mean_prior[3];
+    msg.pose.orientation.x = _mean_prior[4];
+    msg.pose.orientation.y = _mean_prior[5];
+    msg.pose.orientation.z = _mean_prior[6];
 
     _pose_pub.publish(msg);
 }

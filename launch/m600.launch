@@ -13,14 +13,14 @@
         <param name="octree_resolution"        value="0.2"/>
         <param name="max_obstacle_dist"        value="4.0"/>
         <param name="ray_sigma"                value="1.0"/>
-        <param name="cloud_resolution"         value="0.5"/>
+        <param name="cloud_resolution"         value="0.1"/>
         <param name="laser_type"               value="pointcloud"/>
         <param name="cloud_range"              value="50.0"/>
         <param name="set_size"                 value="500"/>
         <param name="pcd_file"                 value="$(find lidar_eskf)/dat/$(arg testName).pcd"/>
         
         <param name="robot_frame"               value="/base_frame"/>
-        <param name="imu_frame"                 value="/imu"/>
+        <param name="imu_frame"                 value="/microstrain"/>
         <param name="imu_frequency"             value="10"/>
         <param name="imu_enabled"               value="true"/>
         <param name="imu_has_quat"              value="true"/>

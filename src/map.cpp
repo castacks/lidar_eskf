@@ -42,34 +42,31 @@ boost::shared_ptr<octomap::OcTree> DistMap::get_map() const{
     return _map_ptr;
 }
 
-//boost::shared_ptr<MapModel> DistMap::get_dist_map() const {
  boost::shared_ptr<DynamicEDTOctomap> DistMap::get_dist_map() const{
     return _dist_map_ptr;
 }
 
 void DistMap::init_dist_map() {
-//    double x, y, z;
-//    _map_ptr->getMetricMin ( x, y, z );
-//    octomap::point3d min ( x, y, z );
-//    min(0) -= _max_obstacle_dist;
-//    min(1) -= _max_obstacle_dist;
-//    min(2) -= _max_obstacle_dist;
-//    _map_ptr->getMetricMax ( x, y, z );
-//    octomap::point3d max ( x, y, z );
-//    max(0) += _max_obstacle_dist;
-//    max(1) += _max_obstacle_dist;
-//    max(2) += _max_obstacle_dist;
-
-    octomap::point3d min(-10.0,-20.0,-20.0);
-    octomap::point3d max(50.0,20.0,5.0);
+    double x, y, z;
+    _map_ptr->getMetricMin ( x, y, z );
+    octomap::point3d min ( x, y, z );
+    min(0) -= _max_obstacle_dist;
+    min(1) -= _max_obstacle_dist;
+    min(2) -= _max_obstacle_dist;
+    _map_ptr->getMetricMax ( x, y, z );
+    octomap::point3d max ( x, y, z );
+    max(0) += _max_obstacle_dist;
+    max(1) += _max_obstacle_dist;
+    max(2) += _max_obstacle_dist;
 
     _dist_map_ptr = boost::shared_ptr<DynamicEDTOctomap> (
                       new DynamicEDTOctomap ( float ( _max_obstacle_dist ), & ( *_map_ptr ), min, max, false ) );
     _dist_map_ptr->update();
 
-    ROS_INFO("DistMap: min = %0.3f %0.3f %0.3f; max = %0.3f %0.3f %0.3f",
-             min(0), min(1), min(2), max(0), max(1), max(2));
-    ROS_INFO("DistMap: initialization done!");
+    ROS_INFO("DistMap: Initialization done.");
+    ROS_INFO("DistMap: Distance map range:");
+    ROS_INFO("         min = [%0.3f %0.3f %0.3f]", min(0), min(1), min(2));
+    ROS_INFO("         max = [%0.3f %0.3f %0.3f]", max(0), max(1), max(2));
 
 
 }
@@ -90,7 +87,6 @@ double DistMap::ray_casting(octomap::point3d endPt, octomap::point3d originPt, o
 }
 
 double DistMap::get_dist(octomap::point3d p) {
-//    return _dist_map_ptr->getDist(p);
     return _dist_map_ptr->getDistance(p);
 }
 char DistMap::get_gridmask(octomap::point3d p) {

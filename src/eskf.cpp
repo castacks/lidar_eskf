@@ -1,17 +1,29 @@
 #include "lidar_eskf/eskf.h"
 
-inline tf::Matrix3x3 vec_to_rot(tf::Vector3 w) {
-    tf::Matrix3x3 R;
-    R.setRPY(w.x(), w.y(), w.z());
+Eigen::Matrix3d skew(Eigen::Vector3d w) {
+    Eigen::Matrix3d W;
+    W <<    0.0, -w.z(),  w.y(),
+          w.z(),    0.0, -w.x(),
+         -w.y(),  w.x(),    0.0;
+    return W;
+}
 
+Eigen::Matrix3d angle_axis_to_rotation_matrix(Eigen::Vector3d w) {
+    double theta = w.norm();
+    Eigen::Matrix3d  W;
+    Eigen::Matrix3d  I;
+    Eigen::Matrix3d  R;
+    W = skew(w / theta);
+    I = Eigen::Matrix3d::Identity();
+    R = I * cos(theta) + W * sin(theta) + W * W * (1-cos(theta));
     return R;
 }
 
-inline tf::Matrix3x3 skew(tf::Vector3 w) {
-    tf::Matrix3x3 R;
-    R.setValue(   0.0, -w.z(),  w.y(),
-                w.z(),    0.0, -w.x(),
-               -w.y(),  w.x(),    0.0);
+Eigen::Matrix3d euler_angle_to_rotation_matrix(Eigen::Vector3d w) {
+    Eigen::Matrix3d R;
+    R = Eigen::AngleAxisd(w[2], Eigen::Vector3d::UnitZ()) *
+        Eigen::AngleAxisd(w[1], Eigen::Vector3d::UnitY()) *
+        Eigen::AngleAxisd(w[0], Eigen::Vector3d::UnitX());
     return R;
 }
 
@@ -41,13 +53,16 @@ ESKF::ESKF(ros::NodeHandle &nh) {
     nh.param("init_bias_acc_z",         _init_bias_acc_z,  0.0);
     nh.param("acc_queue_size",          _acc_queue_size,   5);
     nh.param("imu_transform",           _imu_transform,    false);
+
     // initialize nomial states
     _velocity.setZero();
-    _quaternion.setRPY(_init_roll, _init_pitch, _init_yaw);
-    _rotation.setRotation(_quaternion);
-    
+    _quaternion = Eigen::AngleAxisd(_init_yaw,  Eigen::Vector3d::UnitZ())
+                * Eigen::AngleAxisd(_init_pitch, Eigen::Vector3d::UnitY())
+                * Eigen::AngleAxisd(_init_roll,   Eigen::Vector3d::UnitX());
+    _rotation = _quaternion.toRotationMatrix();
+
     _position.setZero();
-    _bias_acc.setValue(_init_bias_acc_x, _init_bias_acc_y, _init_bias_acc_z);
+    _bias_acc << _init_bias_acc_x, _init_bias_acc_y, _init_bias_acc_z;
     _bias_gyr.setZero();
 
     // initialize error states
@@ -61,7 +76,7 @@ ESKF::ESKF(ros::NodeHandle &nh) {
     // initialize imu
     _imu_acceleration.setZero();
     _imu_angular_velocity.setZero();
-    _imu_orientation.setRPY(0.0,0.0,0.0);
+    _imu_orientation.setIdentity();
 
     // initialize measurements
     _m_position.setZero();
@@ -77,8 +92,7 @@ ESKF::ESKF(ros::NodeHandle &nh) {
     _Q.setZero();
 
     // gravity
-    _gravity.setValue(0.0, 0.0, _g);
-
+    _gravity << 0.0,0.0,_g;
     // time relatives
     _init_time = true;
 
@@ -143,12 +157,14 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
     // stacking into a queue
     if(_acc_queue_count < _acc_queue_size) {
         _acc_queue.push_back(msg.linear_acceleration);
-        tf::vector3MsgToTF(msg.linear_acceleration, _imu_acceleration);
+        _imu_acceleration[0] = msg.linear_acceleration.x;
+        _imu_acceleration[1] = msg.linear_acceleration.y;
+        _imu_acceleration[2] = msg.linear_acceleration.z;
     }
     else {
         _acc_queue[_acc_queue_count%_acc_queue_size] = msg.linear_acceleration;
 
-        tf::Vector3 acc_avg;
+        Eigen::Vector3d acc_avg;
         acc_avg.setZero();
         for(int i=0; i<_acc_queue_size; i++) {
             acc_avg[0] += _acc_queue[i].x / _acc_queue_size;
@@ -159,14 +175,14 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
     }
     _acc_queue_count++; 
 
-    _imu_angular_velocity.setX(msg.angular_velocity.x);
-    _imu_angular_velocity.setY(msg.angular_velocity.y);
-    _imu_angular_velocity.setZ(msg.angular_velocity.z);
+    _imu_angular_velocity[0] = msg.angular_velocity.x;
+    _imu_angular_velocity[1] = msg.angular_velocity.y;
+    _imu_angular_velocity[2] = msg.angular_velocity.z;
 
-    _imu_orientation.setX(msg.orientation.x);
-    _imu_orientation.setY(msg.orientation.y);
-    _imu_orientation.setZ(msg.orientation.z);
-    _imu_orientation.setW(msg.orientation.w);
+    _imu_orientation.x() = msg.orientation.x;
+    _imu_orientation.y() = msg.orientation.y;
+    _imu_orientation.z() = msg.orientation.z;
+    _imu_orientation.w() = msg.orientation.w;
 
     // If imu disabled, set acc, grav to zero
     if(!_imu_enabled) {
@@ -175,8 +191,8 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
     } else {
         // If imu has quaternion, remove gravity.
         if(_imu_has_quat) {
-            tf::Matrix3x3 imu_rot(_imu_orientation);
-            tf::Vector3 grav(0.0, 0.0, _g);
+            Eigen::Matrix3d imu_rot = _imu_orientation.toRotationMatrix();
+            Eigen::Vector3d grav(0.0,0.0,_g);
             _imu_acceleration += imu_rot.transpose() * grav;
             _gravity.setZero();
         }
@@ -186,10 +202,11 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
     if(_imu_transform) {
         tf::StampedTransform transform;
         try{
-            _tf_listener.lookupTransform(_robot_frame, _imu_frame, _imu_time, transform);
-            tf::Matrix3x3 R = transform.getBasis();
-            _imu_acceleration = R * _imu_acceleration;
-            _imu_angular_velocity = R * _imu_angular_velocity;
+            _tf_listener.lookupTransform(_imu_frame, _robot_frame, ros::Time::now(), transform);
+            Eigen::Matrix3d transform_body_to_imu;
+            tf::matrixTFToEigen(transform.getBasis(),transform_body_to_imu);
+            _imu_acceleration = transform_body_to_imu * _imu_acceleration;
+            _imu_angular_velocity = transform_body_to_imu * _imu_angular_velocity;
         } catch (tf::TransformException ex){
             ROS_WARN("ESKF: imu to body transform not found. ");
         }
@@ -197,27 +214,26 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
 }
 
 void ESKF::propagate_state() {
-    tf::Vector3   velocity;
-    tf::Matrix3x3 rotation;
-    tf::Vector3   position;
-    tf::Vector3   bias_acc;
-    tf::Vector3   bias_gyr;
+    Eigen::Vector3d velocity;
+    Eigen::Matrix3d rotation;
+    Eigen::Vector3d position;
+    Eigen::Vector3d bias_acc;
+    Eigen::Vector3d bias_gyr;
 
     // system transition function for nominal state
     velocity = _velocity + (_rotation * (_imu_acceleration - _bias_acc) + _gravity ) * _dt;
-    rotation = _rotation * vec_to_rot((_imu_angular_velocity - _bias_gyr) * _dt);
+    rotation = _rotation * euler_angle_to_rotation_matrix((_imu_angular_velocity - _bias_gyr) * _dt);
     position = _position + _velocity * _dt + 0.5 * (_rotation * (_imu_acceleration - _bias_acc) + _gravity) * _dt * _dt;
     bias_acc = _bias_acc;
     bias_gyr = _bias_gyr;
 
     // update norminal state to the next step
-    _velocity = velocity;
-    _rotation = rotation;
-    _position = position;
-    _bias_acc = bias_acc;
-    _bias_gyr = bias_gyr;
-
-    _rotation.getRotation(_quaternion);
+    _velocity   = velocity;
+    _rotation   = rotation;
+    _quaternion = Eigen::Quaterniond(_rotation);
+    _position   = position;
+    _bias_acc   = bias_acc;
+    _bias_gyr   = bias_gyr;
 }
 
 void ESKF::propagate_error() {
@@ -228,13 +244,13 @@ void ESKF::propagate_error() {
 
 void ESKF::propagate_covariance() {
     // compute jacobian
-    Eigen::Matrix<double, 3, 3> I = Eigen::MatrixXd::Identity(3, 3);
-    Eigen::Matrix<double, 3, 3> Z = Eigen::MatrixXd::Zero(3, 3);
+    Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+    Eigen::Matrix3d Z = Eigen::Matrix3d::Zero();
 
     Eigen::Matrix<double, 3, 3> R, R_1, R_2;
-    tf::matrixTFToEigen(_rotation, R);
-    tf::matrixTFToEigen(skew(_imu_acceleration - _bias_acc), R_1);
-    tf::matrixTFToEigen(vec_to_rot((_imu_angular_velocity - _bias_gyr) * _dt), R_2);
+    R = _rotation;
+    R_1 = skew(_imu_acceleration - _bias_acc);
+    R_2 = euler_angle_to_rotation_matrix((_imu_angular_velocity - _bias_gyr) * _dt);
 
     _Fx <<     I,      Z,       -R*R_1*_dt,   -R*_dt,        Z,
            I*_dt,      I,                Z,        Z,        Z,
@@ -262,9 +278,22 @@ void ESKF::get_mean_pose(Eigen::Matrix<double, 6, 1> &mean_pose) {
     mean_pose[1] = _position.y();
     mean_pose[2] = _position.z();
 
-    _rotation.getRPY(mean_pose[3], mean_pose[4], mean_pose[5]);
+    Eigen::Vector3d euler_angles = _rotation.eulerAngles(2,1,0);
+    mean_pose[3] = euler_angles[2];
+    mean_pose[4] = euler_angles[1];
+    mean_pose[5] = euler_angles[0];
 }
 
+void ESKF::get_mean_pose(Eigen::Matrix<double, 7, 1> &mean_pose) {
+    mean_pose[0] = _position.x();
+    mean_pose[1] = _position.y();
+    mean_pose[2] = _position.z();
+
+    mean_pose[3] = _quaternion.w();
+    mean_pose[4] = _quaternion.x();
+    mean_pose[5] = _quaternion.y();
+    mean_pose[6] = _quaternion.z();
+}
 void ESKF::get_cov_pose(Eigen::Matrix<double, 6, 6> &cov_pose) {
     cov_pose = _Sigma.block<6,6>(3,3);
 }
@@ -328,10 +357,7 @@ void ESKF::publish_odom() {
     msg.pose.pose.orientation.y = _quaternion.y();
     msg.pose.pose.orientation.z = _quaternion.z();
     msg.pose.pose.orientation.w = _quaternion.w();
-    //double r, p, y;
-    //tf::Matrix3x3 R(_quaternion);
-    //R.getRPY(r, p, y);
-    //ROS_INFO("ESKF: odom roll pitch yaw: [%0.2f, %0.2f, %0.2f]", r, p, y);
+
     msg.twist.twist.angular.x = _imu_angular_velocity.x();
     msg.twist.twist.angular.y = _imu_angular_velocity.y();
     msg.twist.twist.angular.z = _imu_angular_velocity.z();
@@ -374,10 +400,8 @@ void ESKF::publish_bias() {
 }
 
 void ESKF::update_meas_mean(Eigen::Matrix<double, 6, 1> &mean_meas) {
-    _m_position.setValue(mean_meas[0],mean_meas[1],mean_meas[2]);
-    _m_theta.setValue(mean_meas[3],mean_meas[4],mean_meas[5]);
-    
-    //std::cout << "eskf: update mean as " << mean_meas.transpose() << std::endl;
+    _m_position = mean_meas.block<3,1>(0,0);
+    _m_theta = mean_meas.block<3,1>(3,0);
 }
 
 void ESKF::update_meas_cov(Eigen::Matrix<double, 6, 6> &cov_meas) {
@@ -391,8 +415,8 @@ void ESKF::update_meas_flag() {
 void ESKF::update_error() {
     // assume only pose measurement is used
     Eigen::Matrix<double, 6, 15> H;
-    Eigen::Matrix<double, 3, 3> I = Eigen::MatrixXd::Identity(3, 3);
-    Eigen::Matrix<double, 3, 3> Z = Eigen::MatrixXd::Zero(3, 3);
+    Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+    Eigen::Matrix3d Z = Eigen::Matrix3d::Zero();
     H << Z, I, Z, Z, Z,
          Z, Z, I, Z, Z;
 
@@ -409,13 +433,12 @@ void ESKF::update_error() {
     Eigen::Matrix<double, 15, 1> x;
     x = K * y;
 
-    _d_velocity.setValue(x[0],  x[1],  x[2]);
-    _d_position.setValue(x[3],  x[4],  x[5]);
-    _d_theta.setValue(   x[6],  x[7],  x[8]);
-    _d_bias_acc.setValue(x[9],  x[10], x[11]);
-    _d_bias_gyr.setValue(x[12], x[13], x[14]);
-
-    _d_rotation.setRPY(_d_theta.x(),_d_theta.y(),_d_theta.z());
+    _d_velocity << x[0],  x[1],  x[2];
+    _d_position << x[3],  x[4],  x[5];
+    _d_theta    << x[6],  x[7],  x[8];
+    _d_bias_acc << x[9],  x[10], x[11];
+    _d_bias_gyr << x[12], x[13], x[14];
+    _d_rotation << angle_axis_to_rotation_matrix(_d_theta);
 
     // update covariance
     Eigen::Matrix<double, 15, 15> M;
@@ -430,8 +453,7 @@ void ESKF::update_state() {
     _rotation *= _d_rotation;
     _bias_acc += _d_bias_acc;
     _bias_gyr += _d_bias_gyr;
-
-    _rotation.getRotation(_quaternion);
+    _quaternion = Eigen::Quaterniond(_rotation);
 }
 
 void ESKF::reset_error() {

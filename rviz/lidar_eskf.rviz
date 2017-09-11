@@ -6,9 +6,10 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /dsmp_scan1
         - /dsmp_scan1/Autocompute Value Bounds1
+        - /TF1
         - /TF1/Frames1
+        - /Axes1
       Splitter Ratio: 0.656977
     Tree Height: 865
   - Class: rviz/Selection
@@ -30,7 +31,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: dsmp_scan
+    SyncSource: map
 Visualization Manager:
   Class: ""
   Displays:
@@ -127,6 +128,7 @@ Visualization Manager:
         X: 0
         Y: 0
         Z: 0
+      Pose Color: 255; 85; 255
       Pose Style: None
       Radius: 0.03
       Shaft Diameter: 0.1
@@ -139,22 +141,12 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        base_frame:
-          Value: true
-        base_frame_view:
-          Value: true
+        camera:
+          Value: false
         imu:
           Value: true
-        laser_shaft:
-          Value: true
-        motor_base:
-          Value: true
-        motor_shaft:
-          Value: true
-        velodyne:
-          Value: true
         world:
-          Value: true
+          Value: false
         world_view:
           Value: true
       Marker Scale: 2
@@ -164,15 +156,9 @@ Visualization Manager:
       Show Names: false
       Tree:
         world:
-          base_frame:
-            base_frame_view:
+          imu:
+            camera:
               {}
-            imu:
-              motor_base:
-                motor_shaft:
-                  laser_shaft:
-                    velodyne:
-                      {}
           world_view:
             {}
       Update Interval: 0
@@ -210,7 +196,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.005
       Style: Flat Squares
-      Topic: /sync_cloud
+      Topic: /3d_lidar_cloud
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -292,6 +278,13 @@ Visualization Manager:
       Topic: /lidar_eskf/pose
       Unreliable: false
       Value: false
+    - Class: rviz/Axes
+      Enabled: false
+      Length: 1
+      Name: Axes
+      Radius: 0.1
+      Reference Frame: camera
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -316,22 +309,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/XYOrbit
-      Distance: 48.9791
+      Distance: 17.6874
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.933792
-        Y: -0.211924
+        X: -3.84529
+        Y: -0.483701
         Z: 8.46449e-07
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: -0.230203
+      Pitch: 0.4548
       Target Frame: world
       Value: XYOrbit (rviz)
-      Yaw: 5.32537
+      Yaw: 0.298995
     Saved:
       - Class: rviz/XYOrbit
         Distance: 22.1068
@@ -368,5 +361,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1280
-  X: 1920
-  Y: 24
+  X: 442
+  Y: 134

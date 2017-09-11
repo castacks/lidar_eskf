@@ -15,7 +15,6 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   octomap_ros
   laser_geometry
-  dynamicEDT3D
 )
 
 find_package(Boost REQUIRED COMPONENTS system random)
@@ -55,6 +54,7 @@ catkin_package(
   CATKIN_DEPENDS tf
   DEPENDS octomap dynamicEDT3D
 )
+set(DYNAMICEDT3D_LIBRARIES "/opt/ros/indigo/lib/libdynamicedt3d.so")
 
 include_directories(
   include
@@ -76,15 +76,12 @@ target_link_libraries(map ${catkin_LIBRARIES} ${DYNAMICEDT3D_LIBRARIES})
 add_library(gpf src/gpf.cpp)
 target_link_libraries(gpf eskf particles ${catkin_LIBRARIES})
 
-#add_executable(eskf_test src/eskf_test.cpp)
-#target_link_libraries(eskf_test eskf ${catkin_LIBRARIES})
-#add_executable(gpf_test src/gpf_test.cpp)
-#target_link_libraries(gpf_test eskf map gpf particles ${catkin_LIBRARIES} ${PCL_LIBRARY_DIRS} ${OCTOMAP_LIBRARY_DIRS})
+add_executable(eskf_test test/eskf_test.cpp)
+target_link_libraries(eskf_test eskf ${catkin_LIBRARIES})
+add_executable(gpf_test test/gpf_test.cpp)
+target_link_libraries(gpf_test eskf map gpf particles ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OCTOMAP_LIBRARIES})
 add_executable(bag_to_pcd src/bag_to_pcd.cpp)
-target_link_libraries(bag_to_pcd ${PCL_LIBRARY_DIRS} ${catkin_LIBRARIES} ${OCTOMAP_LIBRARIES})
+target_link_libraries(bag_to_pcd ${PCL_LIBRARIES} ${catkin_LIBRARIES} ${OCTOMAP_LIBRARIES})
 
 add_executable(lidar_eskf_node src/lidar_eskf_node.cpp)
 target_link_libraries(lidar_eskf_node eskf map gpf particles ${catkin_LIBRARIES} ${OCTOMAP_LIBRARIES} )
-
-add_executable(localization_evaluation src/localization_evaluation.cpp)
-target_link_libraries(localization_evaluation ${catkin_LIBRARIES})

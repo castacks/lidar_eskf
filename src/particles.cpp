@@ -23,7 +23,7 @@ void Particles::set_cloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr) {
     _cloud_ptr = cloud_ptr;
 }
 
-void Particles::set_mean(Eigen::Matrix<double, STATE_SIZE, 1> &mean) {
+void Particles::set_mean(Eigen::Matrix<double, 7, 1> &mean) {
     _mean_prior = mean;
 }
 
@@ -49,40 +49,45 @@ void Particles::draw_set() {
 
     for(int i=0; i<_set_size; i++) {
         // random sample error states
-        mvn.nextSample(_d_pset[i].state);
+        Eigen::Matrix<double, 6, 1> twist;
+        mvn.nextSample(twist);
+        _d_pset[i].translation = twist.block<3,1>(0,0);
+        _d_pset[i].angle_axis = twist.block<3,1>(3,0);
 
         _d_pset[i].weight = log(1.0/_set_size);
         _pset[i].weight = _d_pset[i].weight;
 
         // recover nominal states
-        _pset[i].state = _mean_prior + _d_pset[i].state;
+        _pset[i].translation = _mean_prior.block<3,1>(0,0) + _d_pset[i].translation;
 
         // recover nominal states: rotation
-        tf::Matrix3x3 rotation, d_rotation;
-        rotation.setRPY(_mean_prior[3], _mean_prior[4], _mean_prior[5]);
-        d_rotation.setRPY(_d_pset[i].state[3], _d_pset[i].state[4], _d_pset[i].state[5]);
-        rotation  = rotation * d_rotation;
-        rotation.getRPY(_pset[i].state[3], _pset[i].state[4], _pset[i].state[5]);
+        Eigen::Matrix3d d_rotation = angle_axis_to_rotation_matrix(_d_pset[i].angle_axis);
+        _pset[i].rotation = Eigen::Quaterniond(_mean_prior[3],_mean_prior[4],
+                _mean_prior[5],_mean_prior[6]) * Eigen::Quaterniond(d_rotation);
     }
 
     _d_mean_sample.setZero();
     _d_cov_sample.setZero();
 
     for(int i=0; i<_set_size; i++) {
-        _d_mean_sample += _d_pset[i].state / _set_size;
+        _d_mean_sample.block<3,1>(0,0) += _d_pset[i].translation / _set_size;
+        _d_mean_sample.block<3,1>(3,0) += _d_pset[i].angle_axis / _set_size;
     }
     for(int i=0; i<_set_size; i++) {
-        _d_cov_sample += (_d_pset[i].state - _d_mean_sample)*(_d_pset[i].state - _d_mean_sample).transpose() / _set_size;
+        Eigen::Matrix<double, 6, 1> twist;
+        twist << _d_pset[i].translation - _d_mean_sample.block<3,1>(0,0),
+                 _d_pset[i].angle_axis - _d_mean_sample.block<3,1>(3,0);
+        _d_cov_sample += twist*twist.transpose() / _set_size;
     }
 }
 
 void Particles::weight_set() {
-#pragma omp parallel for
+//#pragma omp parallel for
     for(int i=0; i<_set_size; i++) {
         // reproject cloud on to each particle
         pcl::PointCloud<pcl::PointXYZ> cloud_transformed;
-        reproject_cloud(_pset[i], cloud_transformed);
-
+//        reproject_cloud(_pset[i], cloud_transformed);
+        pcl::transformPointCloud(*_cloud_ptr, cloud_transformed, _pset[i].translation, _pset[i].rotation);
         // weight particle
         weight_particle(_pset[i], cloud_transformed);
     }
@@ -129,40 +134,14 @@ void Particles::weight_set() {
 
 void Particles::reproject_cloud(Particle &p, pcl::PointCloud<pcl::PointXYZ> &cloud) {
 
-    // transform cloud
-    // Eigen::Matrix4d transform;
-    // Eigen::Matrix3d rotation;
-    // Eigen::Vector3d translation;
-
-    // translation << p.state[0],
-    //                p.state[1],
-    //                p.state[2];
-
-    // rotation = Eigen::AngleAxisd(p.state[3], Eigen::Vector3d(1.0,0.0,0.0))
-    //          * Eigen::AngleAxisd(p.state[4], Eigen::Vector3d(0.0,1.0,0.0))
-    //          * Eigen::AngleAxisd(p.state[5], Eigen::Vector3d(0.0,0.0,1.0));
-    // transform << rotation, translation,
-    //              0, 0, 0, 1;
-
-    tf::Matrix3x3 rotation;
-    tf::Vector3 translation;
-    Eigen::Matrix4d transform;
-
-    translation.setValue(p.state[0], p.state[1], p.state[2]);
-    rotation.setRPY(p.state[3], p.state[4], p.state[5]);
-    transform << rotation[0][0], rotation[0][1], rotation[0][2], translation[0],
-                 rotation[1][0], rotation[1][1], rotation[1][2], translation[1],
-                 rotation[2][0], rotation[2][1], rotation[2][2], translation[2],
-                 0,0,0,1;
-
-    pcl::transformPointCloud(*_cloud_ptr, cloud, transform);
+    pcl::transformPointCloud(*_cloud_ptr, cloud, p.translation, p.rotation);
 }
 
 void Particles::weight_particle(Particle &p, pcl::PointCloud<pcl::PointXYZ> &cloud) {
     std::vector<double> weight;
     weight.resize(cloud.size());
 
-#pragma omp parallel for
+//#pragma omp parallel for
     for(int i=0; i<cloud.size(); i++) {
         // the end point of one ray
         octomap::point3d end_pnt(cloud[i].x, cloud[i].y, cloud[i].z);
@@ -198,17 +177,43 @@ void Particles::get_posterior() {
     _d_cov_posterior.setZero();
 
     for(int i=0; i<_set_size; i++) {
-        _d_mean_posterior += exp(_d_pset[i].weight) * _d_pset[i].state;
+        _d_mean_posterior.block<3,1>(0,0) += exp(_d_pset[i].weight) * _d_pset[i].translation;
+        _d_mean_posterior.block<3,1>(3,0) += exp(_d_pset[i].weight) * _d_pset[i].angle_axis;
+
     }
     for(int i=0; i<_set_size; i++) {
-        _d_cov_posterior += exp(_d_pset[i].weight) * (_d_pset[i].state - _d_mean_posterior) * (_d_pset[i].state - _d_mean_posterior).transpose();
+        Eigen::Matrix<double, 6, 1> twist;
+        twist.block<3,1>(0,0) = _d_pset[i].translation - _d_mean_posterior.block<3,1>(0,0);
+        twist.block<3,1>(3,0) = _d_pset[i].angle_axis - _d_mean_posterior.block<3,1>(3,0);
+        _d_cov_posterior += exp(_d_pset[i].weight) * (twist) * (twist).transpose();
     }
 }
 
-void Particles::propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean_prior,
-                          Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov_prior,
-                          Eigen::Matrix<double, STATE_SIZE, 1> &mean_posterior,
-                          Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov_posterior) {
+//void Particles::propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean_prior,
+//                          Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov_prior,
+//                          Eigen::Matrix<double, STATE_SIZE, 1> &mean_posterior,
+//                          Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &cov_posterior) {
+
+//    // generate particles
+//    draw_set();
+
+//    // weight each particles
+//    double start = ros::Time::now().toSec();
+//    weight_set();
+//    //ROS_INFO("weighting time: %f",ros::Time::now().toSec() - start );
+
+//    // compute weighted mean and cov
+//    get_posterior();
+
+//    mean_prior = _d_mean_sample;
+//    cov_prior = _d_cov_sample;
+//    mean_posterior = _d_mean_posterior;
+//    cov_posterior  = _d_cov_posterior;
+//}
+void Particles::propagate(Eigen::Matrix<double, 6, 1> &mean_prior,
+                          Eigen::Matrix<double, 6, 6> &cov_prior,
+                          Eigen::Matrix<double, 6, 1> &mean_posterior,
+                          Eigen::Matrix<double, 6, 6> &cov_posterior) {
 
     // generate particles
     draw_set();
@@ -226,7 +231,6 @@ void Particles::propagate(Eigen::Matrix<double, STATE_SIZE, 1> &mean_prior,
     mean_posterior = _d_mean_posterior;
     cov_posterior  = _d_cov_posterior;
 }
-
 std::vector<Particle> Particles::get_pset() {
     return _pset;
 }

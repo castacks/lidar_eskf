@@ -29,10 +29,10 @@ public:
     GPF(ros::NodeHandle &nh, boost::shared_ptr<DistMap> map_ptr);
     ~GPF();
 
+    void pozyx_callback(const geometry_msgs::PoseWithCovariance &msg);
     void cloud_callback(const sensor_msgs::PointCloud2 &msg);
     void scan_callback(const sensor_msgs::LaserScan &msg);
     void downsample();
-    void structure_resample();
     void recover_meas();
     void check_posdef(Eigen::Matrix<double, STATE_SIZE, STATE_SIZE> &R);
     void publish_cloud();
@@ -46,8 +46,8 @@ public:
 
 private:
 
-    Eigen::Matrix<double, 6, 1> _mean_prior;
-    Eigen::Matrix<double, 6, 6> _cov_prior;
+    Eigen::Matrix<double, 7, 1> _mean_prior; // nominal
+    Eigen::Matrix<double, 6, 6> _cov_prior;  // error
     Eigen::Matrix<double, 6, 1> _mean_sample;
     Eigen::Matrix<double, 6, 6> _cov_sample;
     Eigen::Matrix<double, 6, 1> _mean_posterior;
@@ -55,6 +55,7 @@ private:
     Eigen::Matrix<double, 6, 1> _mean_meas;
     Eigen::Matrix<double, 6, 6> _cov_meas;
 
+    ros::Subscriber _pozyx_sub;
     ros::Subscriber _cloud_sub;
     ros::Subscriber _scan_sub;
     ros::Publisher  _cloud_pub;
@@ -79,12 +80,6 @@ private:
     double _ray_sigma;
     int    _set_size;
     double _cloud_range;
-
-    double _imu_to_laser_roll;
-    double _imu_to_laser_pitch;
-    double _imu_to_laser_yaw;
-    tf::Matrix3x3 _imu_to_laser_rotation;
-    Eigen::Matrix<double, 4, 4> _imu_to_laser_transform;
 
     nav_msgs::Path _path;
     std::deque<geometry_msgs::PoseStamped> _pose_deque;
