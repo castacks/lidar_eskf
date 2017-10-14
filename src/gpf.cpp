@@ -192,10 +192,10 @@ void GPF::cloud_callback(const sensor_msgs::PointCloud2 &msg) {
     
     // check if the recovered pseudo mesure is valid
     for(int i=0; i<_mean_meas.size(); i++) {
-        if(isnan(_mean_meas(i))) return;
+        if(std::isnan(_mean_meas(i))) return;
     }
     for(int i=0; i<_cov_meas.size(); i++) {
-        if(isnan(_cov_meas(i))) return;
+        if(std::isnan(_cov_meas(i))) return;
     }
     // update eskf
     _eskf_ptr->update_meas_mean(_mean_meas);
