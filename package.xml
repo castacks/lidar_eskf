@@ -2,18 +2,12 @@
 <package>
   <name>lidar_eskf</name>
   <version>0.0.0</version>
-  <description>The lidar_eskf package</description>
+  <description>The lidar_eskf package for rotating LiDAR localization</description>
+  <maintainer email="weikunz@andrew.cmu.edu">Weikun Zhen (The AIR lab, Carnegie Mellon University)</maintainer>
 
-  <!-- One maintainer tag required, multiple allowed, one person per tag --> 
-  <!-- Example:  -->
-  <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
-  <maintainer email="zhenwk@gmail.com">Weikun Zhen</maintainer>
-
-
-  <!-- One license tag required, multiple allowed, one license per tag -->
-  <!-- Commonly used license strings: -->
-  <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
-  <license>TODO</license>
+  <author>Weikun Zhen (The AIR lab, Carnegie Mellon University) </author>
+  <url type="website"></url>
+  <license>BSD</license>
 
 
   <buildtool_depend>catkin</buildtool_depend>

@@ -1,3 +1,10 @@
+/*
+* Copyright (c) 2016 Carnegie Mellon University, Weikun Zhen <weikunz@andrew.cmu.edu>
+*
+* For License information please see the LICENSE file in the root directory.
+*
+*/
+
 #include "lidar_eskf/eskf.h"
 
 inline tf::Matrix3x3 vec_to_rot(tf::Vector3 w) {

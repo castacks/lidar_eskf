@@ -25,6 +25,8 @@ find_package(PCL 1.7 REQUIRED)
 find_package(dynamicEDT3D REQUIRED)
 find_package(OpenMP)
 
+set(dynamicEDT3D_LIBRARIES "/opt/ros/indigo/lib/libdynamicedt3d.so")
+
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
@@ -88,3 +90,5 @@ target_link_libraries(lidar_eskf_node eskf map gpf particles ${catkin_LIBRARIES}
 
 add_executable(localization_evaluation src/localization_evaluation.cpp)
 target_link_libraries(localization_evaluation ${catkin_LIBRARIES})
+
+

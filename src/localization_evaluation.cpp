@@ -1,3 +1,10 @@
+/*
+* Copyright (c) 2016 Carnegie Mellon University, Weikun Zhen <weikunz@andrew.cmu.edu>
+*
+* For License information please see the LICENSE file in the root directory.
+*
+*/
+
 #include <iostream>
 #include <geometry_msgs/Pose.h>
 #include <tf/transform_listener.h>

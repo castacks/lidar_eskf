@@ -1,3 +1,10 @@
+/*
+* Copyright (c) 2016 Carnegie Mellon University, Weikun Zhen <weikunz@andrew.cmu.edu>
+*
+* For License information please see the LICENSE file in the root directory.
+*
+*/
+
 #ifndef ESKF_H
 #define ESKF_H
 
@@ -16,6 +23,7 @@
 #include <tf/transform_listener.h>
 #include <vector>
 #include <numeric>
+
 class ESKF {
 public:
     ESKF(ros::NodeHandle &nh);
@@ -63,7 +71,7 @@ private:
     tf::Vector3    _imu_angular_velocity;
     tf::Quaternion _imu_orientation;
 
-    // Jacobian matrices
+    // jacobian matrices
     Eigen::Matrix<double, 15, 15> _Fx;
     Eigen::Matrix<double, 15, 12> _Fn;
 

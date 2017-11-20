@@ -2,19 +2,12 @@
 #define __EIGENMULTIVARIATENORMAL_HPP
 
 #include <Eigen/Dense>
-
 #include <math.h>
 
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/normal_distribution.hpp>
 #include <boost/random/variate_generator.hpp>
 
-/**
-    We find the eigen-decomposition of the covariance matrix.
-    We create a vector of normal samples scaled by the eigenvalues.
-    We rotate the vector by the eigenvectors.
-    We add the mean.
-*/
 template<typename _Scalar, int _size>
 class EigenMultivariateNormal
 {
