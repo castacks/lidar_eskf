@@ -25,17 +25,17 @@
 		<param name="imu_transform"            value="false"/>
         <param name="map_file_name"            value="$(find lidar_eskf)/map/nsh_1109.bt"/>
         <param name="octree_resolution"        value="0.05"/>
-        <param name="max_obstacle_dist"        value="1.0"/>
-        <param name="ray_sigma"                value="4.0"/>
+        <param name="max_obstacle_dist"        value="0.5"/>
+        <param name="ray_sigma"                value="1.0"/>
         <param name="cloud_resolution"         value="0.1"/>
 		<param name="laser_type"               value="pointcloud"/>
-        <param name="cloud_range"              value="20.0"/>
+        <param name="cloud_range"              value="30.0"/>
         <param name="set_size"                 value="500"/>
         <param name="pcd_file"                 value="$(find lidar_eskf)/dat/recmap_nsh_1109.pcd"/>
         
         <param name="imu_frequency"             value="200"/>
-        <param name="sigma_acceleration"        value="2.0"/>
-        <param name="sigma_gyroscop"            value="0.5"/>
+        <param name="sigma_acceleration"        value="4.0"/>
+        <param name="sigma_gyroscope"           value="0.1"/>
         <param name="sigma_acceleration_bias"   value="0.002"/>
         <param name="sigma_gyroscope_bias"      value="0.001"/>
         <param name="gravity"                   value="9.82"/>
@@ -45,10 +45,6 @@
         <param name="init_bias_acc_z"           value="0.0"/> #-0.032
         
         <param name="acc_queue_size"            value="5"/>
-        
-        <param name="imu_to_laser_roll"            value="0.0"/>
-        <param name="imu_to_laser_pitch"           value="0.0"/>
-        <param name="imu_to_laser_yaw"             value="0.0"/>
 
 	</node>
 	

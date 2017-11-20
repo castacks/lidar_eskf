@@ -14,6 +14,7 @@
 #include <tf/tf.h>
 #include <tf_conversions/tf_eigen.h>
 #include <Eigen/Dense>
+#include <Eigen/Geometry>
 #include <queue>
 #include <boost/circular_buffer.hpp>
 #include <fstream>
@@ -21,6 +22,7 @@
 #include <time.h>
 #include <string>
 #include <tf/transform_listener.h>
+#include <tf_conversions/tf_eigen.h>
 #include <vector>
 #include <numeric>
 
@@ -36,6 +38,7 @@ public:
     void propagate_covariance();
     void propagate_state();
     void get_mean_pose(Eigen::Matrix<double, 6, 1> &mean_pose);
+    void get_mean_pose(Eigen::Matrix<double, 7, 1> &mean_pose);
     void get_cov_pose(Eigen::Matrix<double, 6, 6> &cov_pose);
     void publish_odom();
     void publish_bias();
@@ -51,25 +54,26 @@ public:
 private:
 
     // nominal states
-    tf::Vector3    _velocity;
-    tf::Matrix3x3  _rotation;
-    tf::Quaternion _quaternion;
-    tf::Vector3    _position;
-    tf::Vector3    _bias_acc;
-    tf::Vector3    _bias_gyr;
+    Eigen::Vector3d _velocity;
+    Eigen::Matrix3d _rotation;
+    Eigen::Quaterniond _quaternion;
+    Eigen::Vector3d _position;
+    Eigen::Vector3d _bias_acc;
+    Eigen::Vector3d _bias_gyr;
+
 
     // error states
-    tf::Vector3   _d_velocity;
-    tf::Vector3   _d_theta;
-    tf::Matrix3x3 _d_rotation;
-    tf::Vector3   _d_position;
-    tf::Vector3   _d_bias_acc;
-    tf::Vector3   _d_bias_gyr;
+    Eigen::Vector3d   _d_velocity;
+    Eigen::Vector3d   _d_theta;
+    Eigen::Matrix3d   _d_rotation;
+    Eigen::Vector3d   _d_position;
+    Eigen::Vector3d   _d_bias_acc;
+    Eigen::Vector3d   _d_bias_gyr;
 
     // imu measurements
-    tf::Vector3    _imu_acceleration;
-    tf::Vector3    _imu_angular_velocity;
-    tf::Quaternion _imu_orientation;
+    Eigen::Vector3d    _imu_acceleration;
+    Eigen::Vector3d    _imu_angular_velocity;
+    Eigen::Quaterniond _imu_orientation;
 
     // jacobian matrices
     Eigen::Matrix<double, 15, 15> _Fx;
@@ -81,7 +85,7 @@ private:
 
     // gravity
     double _g;
-    tf::Vector3 _gravity;
+    Eigen::Vector3d _gravity;
 
     // time relatives
     ros::Time _imu_time; 
@@ -100,8 +104,8 @@ private:
     ros::Publisher  _odom_pub, _bias_pub;
 
     // odometry measurements
-    tf::Vector3    _m_theta;
-    tf::Vector3    _m_position;
+    Eigen::Vector3d    _m_theta;
+    Eigen::Vector3d    _m_position;
     bool _got_measurements;
 
     Eigen::Matrix<double, 6, 6> _m_pose_sigma;
@@ -134,5 +138,9 @@ private:
     std::vector<double> _vz_buf;
 
 };
+
+Eigen::Matrix3d skew(Eigen::Vector3d w);
+Eigen::Matrix3d angle_axis_to_rotation_matrix(Eigen::Vector3d w);
+Eigen::Matrix3d euler_angle_to_rotation_matrix(Eigen::Vector3d w);
 
 #endif // IMUODOM_H
