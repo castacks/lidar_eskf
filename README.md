@@ -1,10 +1,8 @@
 # README #
 
-This README should able to help you setup and run this program.
-
 ### What is this repository for? ###
 
-**lidar_eskf** is a package for localization or pose tracking with g2 and microstrain. The localization is cast into an ESKF framework, while a GPF is used to encode range measurements. 
+**lidar_eskf** is a package for localization or pose tracking with g2 (rotating 2d lidar) and microstrain (imu). The localization is cast into an ESKF framework, while a GPF is used to encode range measurements. 
 
 ### How do I get set up? ###
 
