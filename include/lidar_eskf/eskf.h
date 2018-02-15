@@ -29,7 +29,7 @@
 class ESKF {
 public:
     ESKF(ros::NodeHandle &nh);
-    ~ESKF();
+    ~ESKF() {}
 
     void imu_callback(const sensor_msgs::Imu &msg);
     void update_time(const sensor_msgs::Imu &msg);

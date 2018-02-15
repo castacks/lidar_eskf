@@ -7,7 +7,6 @@ Panels:
         - /Global Options1
         - /Status1
         - /dsmp_scan1/Autocompute Value Bounds1
-        - /TF1
         - /TF1/Frames1
         - /Axes1
       Splitter Ratio: 0.656977
@@ -39,7 +38,7 @@ Visualization Manager:
       Cell Size: 0.1
       Class: rviz/Grid
       Color: 160; 160; 164
-      Enabled: true
+      Enabled: false
       Line Style:
         Line Width: 0.03
         Value: Lines
@@ -52,7 +51,7 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 100
       Reference Frame: <Fixed Frame>
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -128,7 +127,6 @@ Visualization Manager:
         X: 0
         Y: 0
         Z: 0
-      Pose Color: 255; 85; 255
       Pose Style: None
       Radius: 0.03
       Shaft Diameter: 0.1
@@ -309,7 +307,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/XYOrbit
-      Distance: 17.6874
+      Distance: 22.9009
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
@@ -321,10 +319,10 @@ Visualization Manager:
         Z: 8.46449e-07
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.4548
+      Pitch: 0.8098
       Target Frame: world
       Value: XYOrbit (rviz)
-      Yaw: 0.298995
+      Yaw: 6.22718
     Saved:
       - Class: rviz/XYOrbit
         Distance: 22.1068
@@ -361,5 +359,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1280
-  X: 442
-  Y: 134
+  X: 412
+  Y: 15

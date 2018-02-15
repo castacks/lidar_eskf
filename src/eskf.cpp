@@ -17,6 +17,8 @@ Eigen::Matrix3d skew(Eigen::Vector3d w) {
 
 Eigen::Matrix3d angle_axis_to_rotation_matrix(Eigen::Vector3d w) {
     double theta = w.norm();
+
+    // should check if theta = 0.0
     Eigen::Matrix3d  W;
     Eigen::Matrix3d  I;
     Eigen::Matrix3d  R;
@@ -157,26 +159,9 @@ void ESKF::update_time(const sensor_msgs::Imu &msg) {
 
 void ESKF::update_imu(const sensor_msgs::Imu &msg) {
 
-    // stacking into a queue
-    // if(_acc_queue_count < _acc_queue_size) {
-        _acc_queue.push_back(msg.linear_acceleration);
-        _imu_acceleration[0] = msg.linear_acceleration.x;
-        _imu_acceleration[1] = msg.linear_acceleration.y;
-        _imu_acceleration[2] = msg.linear_acceleration.z;
-    // }
-    // else {
-    //     _acc_queue[_acc_queue_count%_acc_queue_size] = msg.linear_acceleration;
-
-    //     Eigen::Vector3d acc_avg;
-    //     acc_avg.setZero();
-    //     for(int i=0; i<_acc_queue_size; i++) {
-    //         acc_avg[0] += _acc_queue[i].x / _acc_queue_size;
-    //         acc_avg[1] += _acc_queue[i].y / _acc_queue_size;
-    //         acc_avg[2] += _acc_queue[i].z / _acc_queue_size;
-    //     }
-    //     _imu_acceleration = acc_avg;
-    // }
-    // _acc_queue_count++; 
+    _imu_acceleration[0] = msg.linear_acceleration.x;
+    _imu_acceleration[1] = msg.linear_acceleration.y;
+    _imu_acceleration[2] = msg.linear_acceleration.z; 
 
     _imu_angular_velocity[0] = msg.angular_velocity.x;
     _imu_angular_velocity[1] = msg.angular_velocity.y;
@@ -187,33 +172,11 @@ void ESKF::update_imu(const sensor_msgs::Imu &msg) {
     _imu_orientation.z() = msg.orientation.z;
     _imu_orientation.w() = msg.orientation.w;
 
-    // If imu disabled, set acc, grav to zero
-    if(!_imu_enabled) {
-        _imu_acceleration.setZero();
-        _gravity.setZero();
-    } else {
-        // If imu has quaternion, remove gravity.
-        if(_imu_has_quat) {
-            Eigen::Matrix3d imu_rot = _imu_orientation.toRotationMatrix();
-            Eigen::Vector3d grav(0.0,0.0,_g);
-            _imu_acceleration += imu_rot.transpose() * grav;
-            _gravity.setZero();
-        }
-    }
-
-    // reproject imu to body frame
-    if(_imu_transform) {
-        tf::StampedTransform transform;
-        try{
-            _tf_listener.lookupTransform(_imu_frame, _robot_frame, ros::Time::now(), transform);
-            Eigen::Matrix3d transform_body_to_imu;
-            tf::matrixTFToEigen(transform.getBasis(),transform_body_to_imu);
-            _imu_acceleration = transform_body_to_imu * _imu_acceleration;
-            _imu_angular_velocity = transform_body_to_imu * _imu_angular_velocity;
-        } catch (tf::TransformException ex){
-            ROS_WARN("ESKF: imu to body transform not found. ");
-        }
-    }
+    // remove gravity from imu
+    Eigen::Matrix3d imu_rot = _imu_orientation.toRotationMatrix();
+    Eigen::Vector3d grav(0.0,0.0,_g);
+    _imu_acceleration += imu_rot.transpose() * grav;
+    _gravity.setZero();
 }
 
 void ESKF::propagate_state() {
