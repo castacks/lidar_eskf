@@ -121,9 +121,6 @@ ESKF::ESKF(ros::NodeHandle &nh) {
     _vz_buf.resize(_smooth_buf_size);
 }
 
-ESKF::~ESKF() {
-    //output_log();
-}
 
 void ESKF::imu_callback(const sensor_msgs::Imu &msg) {
     update_time(msg);
@@ -139,7 +136,6 @@ void ESKF::imu_callback(const sensor_msgs::Imu &msg) {
         update_error();
         update_state();
         reset_error();
-        publish_bias();
         _got_measurements = false;
     }
 
@@ -162,25 +158,25 @@ void ESKF::update_time(const sensor_msgs::Imu &msg) {
 void ESKF::update_imu(const sensor_msgs::Imu &msg) {
 
     // stacking into a queue
-    if(_acc_queue_count < _acc_queue_size) {
+    // if(_acc_queue_count < _acc_queue_size) {
         _acc_queue.push_back(msg.linear_acceleration);
         _imu_acceleration[0] = msg.linear_acceleration.x;
         _imu_acceleration[1] = msg.linear_acceleration.y;
         _imu_acceleration[2] = msg.linear_acceleration.z;
-    }
-    else {
-        _acc_queue[_acc_queue_count%_acc_queue_size] = msg.linear_acceleration;
+    // }
+    // else {
+    //     _acc_queue[_acc_queue_count%_acc_queue_size] = msg.linear_acceleration;
 
-        Eigen::Vector3d acc_avg;
-        acc_avg.setZero();
-        for(int i=0; i<_acc_queue_size; i++) {
-            acc_avg[0] += _acc_queue[i].x / _acc_queue_size;
-            acc_avg[1] += _acc_queue[i].y / _acc_queue_size;
-            acc_avg[2] += _acc_queue[i].z / _acc_queue_size;
-        }
-        _imu_acceleration = acc_avg;
-    }
-    _acc_queue_count++; 
+    //     Eigen::Vector3d acc_avg;
+    //     acc_avg.setZero();
+    //     for(int i=0; i<_acc_queue_size; i++) {
+    //         acc_avg[0] += _acc_queue[i].x / _acc_queue_size;
+    //         acc_avg[1] += _acc_queue[i].y / _acc_queue_size;
+    //         acc_avg[2] += _acc_queue[i].z / _acc_queue_size;
+    //     }
+    //     _imu_acceleration = acc_avg;
+    // }
+    // _acc_queue_count++; 
 
     _imu_angular_velocity[0] = msg.angular_velocity.x;
     _imu_angular_velocity[1] = msg.angular_velocity.y;
@@ -389,23 +385,6 @@ void ESKF::publish_odom() {
     _odom_vec.push_back(msg);
 }
 
-void ESKF::publish_bias() {
-    geometry_msgs::TwistStamped msg;
-
-    msg.header.frame_id = "world";
-    msg.header.stamp = _imu_time;
-
-    msg.twist.linear.x = _bias_acc.x();
-    msg.twist.linear.y = _bias_acc.y();
-    msg.twist.linear.z = _bias_acc.z();
-
-    msg.twist.angular.x = _bias_gyr.x();
-    msg.twist.angular.y = _bias_gyr.y();
-    msg.twist.angular.z = _bias_gyr.z();
-
-    _bias_pub.publish(msg);
-}
-
 void ESKF::update_meas_mean(Eigen::Matrix<double, 6, 1> &mean_meas) {
     _m_position = mean_meas.block<3,1>(0,0);
     _m_theta = mean_meas.block<3,1>(3,0);
@@ -470,8 +449,4 @@ void ESKF::reset_error() {
     _d_rotation.setIdentity();
     _d_bias_acc.setZero();
     _d_bias_gyr.setZero();
-}
-
-void ESKF::output_log() {
-
 }
