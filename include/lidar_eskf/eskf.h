@@ -32,26 +32,27 @@ public:
     ~ESKF() {}
 
     void imu_callback(const sensor_msgs::Imu &msg);
-    void update_time(const sensor_msgs::Imu &msg);
-    void update_imu(const sensor_msgs::Imu &msg);
-    void propagate_error();
-    void propagate_covariance();
-    void propagate_state();
+    
+    void update_meas_mean(Eigen::Matrix<double, 6, 1> &mean_meas);
+    void update_meas_cov(Eigen::Matrix<double, 6, 6> &cov_meas);
+    void update_meas_flag();
+    
     void get_mean_pose(Eigen::Matrix<double, 6, 1> &mean_pose);
     void get_mean_pose(Eigen::Matrix<double, 7, 1> &mean_pose);
     void get_cov_pose(Eigen::Matrix<double, 6, 6> &cov_pose);
     void publish_odom();
     void publish_bias();
 
-    void update_meas_mean(Eigen::Matrix<double, 6, 1> &mean_meas);
-    void update_meas_cov(Eigen::Matrix<double, 6, 6> &cov_meas);
-    void update_meas_flag();
+
+private:
+    void update_time(const sensor_msgs::Imu &msg);
+    void update_imu(const sensor_msgs::Imu &msg);
+    void propagate_error();
+    void propagate_covariance();
+    void propagate_state();
     void update_error();
     void update_state();
     void reset_error();
-    void output_log();
-
-private:
 
     // nominal states
     Eigen::Vector3d _velocity;
